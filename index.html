@@ -902,6 +902,9 @@ window.selezionaLocale = (localeId, localeNome) => {
   document.getElementById('loading-msg').textContent = `Caricamento ${localeNome}...`;
   document.getElementById('home-logo').textContent = localeNome;
   document.getElementById('btn-change-locale').style.display = '';
+  // Rimuovi badge sola lettura se presente (non deve esserci per l'admin)
+  const badge = document.querySelector('.readonly-badge');
+  if (badge) badge.remove();
   subscribeToData(localeId);
 };
 
