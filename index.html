@@ -1525,7 +1525,7 @@ function openModal(type) {
   const config=getModalConfig(type);
   document.getElementById('modal-title').textContent=config.title;
   document.getElementById('modal-body').innerHTML=config.html;
-  if(config.chartData) renderChart(config.chartData,config.chartType||'bar',config.colorScheme);
+  if(config.chartData) renderChart(config.chartData,config.chartType||'bar',config.colorScheme,config.unit);
 }
 function closeModal(){document.getElementById('modal-overlay').classList.remove('open');document.body.style.overflow='';if(activeChart){activeChart.destroy();activeChart=null;}}
 function closeModalOutside(e){if(e.target===document.getElementById('modal-overlay'))closeModal();}
@@ -1594,7 +1594,7 @@ function buildBarConfig(title,data,valField,unit,colorScheme){
   const labels=data.map(([k])=>k.replace(/--/g,'').trim());
   const values=data.map(([,v])=>Math.round(v*100)/100);
   const tableRows=data.map(([k,v],i)=>`<tr><td><span class="badge ${i<3?'gold':'blue'}">${i+1}</span> ${k.replace(/--/g,'').trim()}</td><td class="num">${valField==='totale'?fmt(v):v.toFixed(0)+' '+unit}</td></tr>`).join('');
-  return{title,chartData:{labels,values},chartType:'bar',colorScheme,html:`<div class="chart-container"><canvas id="main-chart"></canvas></div><table class="stat-table"><thead><tr><th>Prodotto / Categoria</th><th style="text-align:right">${unit==='€'?'Incasso':'Quantità'}</th></tr></thead><tbody>${tableRows}</tbody></table>`};
+  return{title,unit,chartData:{labels,values},chartType:'bar',colorScheme,html:`<div class="chart-container"><canvas id="main-chart"></canvas></div><table class="stat-table"><thead><tr><th>Prodotto / Categoria</th><th style="text-align:right">${unit==='€'?'Incasso':'Quantità'}</th></tr></thead><tbody>${tableRows}</tbody></table>`};
 }
 
 function buildMarginConfig(title,data){
@@ -1605,10 +1605,11 @@ function buildMarginConfig(title,data){
   return{title,chartData:{labels,values},chartType:'margine',colorScheme:'mixed',html:`<div class="chart-container"><canvas id="main-chart"></canvas></div><table class="stat-table"><thead><tr><th>Prodotto</th><th style="text-align:right">Margine €</th><th style="text-align:right">%</th></tr></thead><tbody>${tableRows}</tbody></table>`};
 }
 
-function renderChart(data,type,colorScheme){
+function renderChart(data,type,colorScheme,unit){
   const canvas=document.getElementById('main-chart'); if(!canvas) return;
   const colors={blue:{bg:'rgba(75,157,232,0.7)',border:'#4b9de8'},gold:{bg:'rgba(232,184,75,0.7)',border:'#e8b84b'}};
-  const opts={indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1d22',titleColor:'#e8b84b',bodyColor:'#f0f2f5',borderColor:'#252930',borderWidth:1,callbacks:{label:ctx=>unit==='pezzi'?' '+ctx.parsed.x+' pz':' '+fmt(ctx.parsed.x)}}},scales:{x:{grid:{color:'#1e2227'},ticks:{color:'#8a919e',font:{family:'Barlow Condensed',size:11},callback:v=>Math.abs(v)>=1000?(v/1000).toFixed(1)+'k':v},border:{color:'#252930'}},y:{grid:{display:false},ticks:{color:'#c0c8d4',font:{family:'Barlow Condensed',size:11},maxTicksLimit:12},border:{color:'#252930'}}}};
+  const tooltipLabel = unit==='pezzi' ? ctx=>' '+ctx.parsed.x+' pz' : ctx=>' '+fmt(ctx.parsed.x);
+  const opts={indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1d22',titleColor:'#e8b84b',bodyColor:'#f0f2f5',borderColor:'#252930',borderWidth:1,callbacks:{label:tooltipLabel}}},scales:{x:{grid:{color:'#1e2227'},ticks:{color:'#8a919e',font:{family:'Barlow Condensed',size:11},callback:v=>Math.abs(v)>=1000?(v/1000).toFixed(1)+'k':v},border:{color:'#252930'}},y:{grid:{display:false},ticks:{color:'#c0c8d4',font:{family:'Barlow Condensed',size:11},maxTicksLimit:12},border:{color:'#252930'}}}};
   if(type==='margine'){activeChart=new Chart(canvas,{type:'bar',data:{labels:data.labels,datasets:[{label:'Margine €',data:data.values,backgroundColor:data.values.map(v=>v>=0?'rgba(61,214,140,0.7)':'rgba(232,75,75,0.7)'),borderColor:data.values.map(v=>v>=0?'#3dd68c':'#e84b4b'),borderWidth:1,borderRadius:6}]},options:opts});}
   else{const c=colors[colorScheme]||colors.blue;activeChart=new Chart(canvas,{type:'bar',data:{labels:data.labels,datasets:[{label:'Valore',data:data.values,backgroundColor:c.bg,borderColor:c.border,borderWidth:1,borderRadius:6}]},options:opts});}
 }
