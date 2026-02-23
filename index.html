@@ -902,9 +902,16 @@ window.selezionaLocale = (localeId, localeNome) => {
   document.getElementById('loading-msg').textContent = `Caricamento ${localeNome}...`;
   document.getElementById('home-logo').textContent = localeNome;
   document.getElementById('btn-change-locale').style.display = '';
-  // Rimuovi badge sola lettura se presente (non deve esserci per l'admin)
+  // Rimuovi badge sola lettura se presente
   const badge = document.querySelector('.readonly-badge');
   if (badge) badge.remove();
+  // Ripristina UI admin (nel caso fosse stata nascosta)
+  document.querySelector('.add-day-zone').style.display = '';
+  document.querySelector('.tipo-select-box').style.display = '';
+  const importBtn = document.querySelector('button[onclick="document.getElementById(\'import-input\').click()"]');
+  if (importBtn) importBtn.style.display = '';
+  const exportBtn = document.querySelector('button[onclick="exportData()"]');
+  if (exportBtn) exportBtn.style.display = '';
   subscribeToData(localeId);
 };
 
