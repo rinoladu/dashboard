@@ -857,12 +857,8 @@ let currentLocaleId = null; // es. 'ego', 'kings', ecc.
 function subscribeToData(localeId) {
   if (unsubscribeSnapshot) unsubscribeSnapshot();
   currentLocaleId = localeId;
-  // I dati sono salvati sotto: users/{adminUid}/locali/{localeId}/chiusure
-  const adminUid = localStorage.getItem(ADMIN_UID_KEY) || currentUser.uid;
-  const dataPath = currentProfilo
-    ? ['users', adminUid, 'locali', currentProfilo.localeId, 'chiusure']
-    : ['users', adminUid, 'locali', localeId, 'chiusure'];
-  const col = collection(db, ...dataPath);
+  const adminUid = currentProfilo ? currentProfilo.adminUid : (localStorage.getItem(ADMIN_UID_KEY) || currentUser.uid);
+  const col = collection(db, 'users', adminUid, 'locali', localeId, 'chiusure');
   const q = query(col, orderBy('data', 'desc'));
   unsubscribeSnapshot = onSnapshot(q, snap => {
     CHIUSURE = snap.docs.map(d => d.data());
