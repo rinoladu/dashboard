@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>EGO Dashboard</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -558,7 +558,10 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
       <div class="dash-title" id="dash-title">Dashboard</div>
       <div class="dash-subtitle" id="dash-subtitle"></div>
     </div>
-    <button class="btn-sm" onclick="tornaHome()">← Home</button>
+    <div style="display:flex;gap:0.4rem">
+      <button class="btn-sm" onclick="faiScreenshot()" id="btn-screenshot" title="Salva immagine">📸</button>
+      <button class="btn-sm" onclick="tornaHome()">← Home</button>
+    </div>
   </div>
   <div class="summary-grid">
     <div class="card"><div class="card-label">Incasso lordo (IVA incl.)</div><div class="card-value accent" id="s-lordo">—</div></div>
@@ -1612,6 +1615,35 @@ function renderChart(data,type,colorScheme,unit){
   const opts={indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1d22',titleColor:'#e8b84b',bodyColor:'#f0f2f5',borderColor:'#252930',borderWidth:1,callbacks:{label:tooltipLabel}}},scales:{x:{grid:{color:'#1e2227'},ticks:{color:'#8a919e',font:{family:'Barlow Condensed',size:11},callback:v=>Math.abs(v)>=1000?(v/1000).toFixed(1)+'k':v},border:{color:'#252930'}},y:{grid:{display:false},ticks:{color:'#c0c8d4',font:{family:'Barlow Condensed',size:11},maxTicksLimit:12},border:{color:'#252930'}}}};
   if(type==='margine'){activeChart=new Chart(canvas,{type:'bar',data:{labels:data.labels,datasets:[{label:'Margine €',data:data.values,backgroundColor:data.values.map(v=>v>=0?'rgba(61,214,140,0.7)':'rgba(232,75,75,0.7)'),borderColor:data.values.map(v=>v>=0?'#3dd68c':'#e84b4b'),borderWidth:1,borderRadius:6}]},options:opts});}
   else{const c=colors[colorScheme]||colors.blue;activeChart=new Chart(canvas,{type:'bar',data:{labels:data.labels,datasets:[{label:'Valore',data:data.values,backgroundColor:c.bg,borderColor:c.border,borderWidth:1,borderRadius:6}]},options:opts});}
+}
+
+// ===== SCREENSHOT =====
+async function faiScreenshot() {
+  const btn = document.getElementById('btn-screenshot');
+  btn.textContent = '⏳';
+  btn.disabled = true;
+  try {
+    // Cattura solo la summary-grid (le card principali)
+    const el = document.getElementById('dashboard-screen');
+    const canvas = await html2canvas(el, {
+      backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg').trim() || '#0a0c0f',
+      scale: 2,
+      useCORS: true,
+      scrollY: 0,
+      windowHeight: el.scrollHeight,
+      height: el.scrollHeight,
+    });
+    const title = document.getElementById('dash-title').textContent;
+    const link = document.createElement('a');
+    link.download = `dashboard-${title.replace(/[^a-z0-9]/gi,'-')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(e) {
+    alert('Errore nella generazione immagine: ' + e.message);
+  } finally {
+    btn.textContent = '📸';
+    btn.disabled = false;
+  }
 }
 
 // ===== UTILS =====
