@@ -1882,7 +1882,7 @@ function aggiornaWidgetObiettivo() {
   let breakEvenAuto = 0;
   if (ultimaMensile && ultimaMensile.costiGiorn > 0) {
     // costiGiorn per mensile = costi del mese
-    const percMarg = ultimaMensile.totImponibile > 0 ? ultimaMensile.totMargine / ultimaMensile.totImponibile : 0;
+    const percMarg = ultimaMensile.totLordo > 0 ? ultimaMensile.totMargine / ultimaMensile.totLordo : 0;
     if (percMarg > 0) breakEvenAuto = ultimaMensile.costiGiorn / percMarg;
   }
 
