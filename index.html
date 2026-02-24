@@ -483,26 +483,20 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
       <div class="subtab" id="subtab-anno" onclick="switchSubtab('anno')">Annuali</div>
     </div>
 
-    <div class="tipo-select-box">
-      <label>Tipo di chiusura da aggiungere</label>
-      <select id="periodo-select">
-        <option value="giornaliera">Giornaliera</option>
-        <option value="settimanale">Settimanale</option>
-        <option value="mensile">Mensile</option>
-        <option value="annuale">Annuale</option>
-      </select>
-    </div>
-    <div id="mese-container" style="margin-bottom:1rem; display:none; padding: 0 1rem;">
-      <label style="color:#aaa; font-size:0.9rem;"><strong>Mese di riferimento</strong></label><br>
-      <select id="mese-select" style="appearance:none;background:#181818;color:white;border:1px solid #2c2c2c;border-radius:8px;padding:0.6rem;margin-top:0.3rem;width:100%;max-width:250px;font-size:0.95rem;">
-        <option value="gennaio">Gennaio</option><option value="febbraio">Febbraio</option>
-        <option value="marzo">Marzo</option><option value="aprile">Aprile</option>
-        <option value="maggio">Maggio</option><option value="giugno">Giugno</option>
-        <option value="luglio">Luglio</option><option value="agosto">Agosto</option>
-        <option value="settembre">Settembre</option><option value="ottobre">Ottobre</option>
-        <option value="novembre">Novembre</option><option value="dicembre">Dicembre</option>
-      </select>
-    </div>
+    <select id="periodo-select" style="display:none">
+      <option value="giornaliera">Giornaliera</option>
+      <option value="settimanale">Settimanale</option>
+      <option value="mensile">Mensile</option>
+      <option value="annuale">Annuale</option>
+    </select>
+    <select id="mese-select" style="display:none">
+      <option value="gennaio">Gennaio</option><option value="febbraio">Febbraio</option>
+      <option value="marzo">Marzo</option><option value="aprile">Aprile</option>
+      <option value="maggio">Maggio</option><option value="giugno">Giugno</option>
+      <option value="luglio">Luglio</option><option value="agosto">Agosto</option>
+      <option value="settembre">Settembre</option><option value="ottobre">Ottobre</option>
+      <option value="novembre">Novembre</option><option value="dicembre">Dicembre</option>
+    </select>
     <div class="add-day-zone" onclick="document.getElementById('file-input').click()">
       <span style="font-size:2rem;display:block;margin-bottom:0.5rem">📊</span>
       <h3>Aggiungi chiusura</h3>
@@ -841,7 +835,7 @@ function aggiornaUIReadonly() {
   if (importBtn) importBtn.style.display = 'none';
   const exportBtn = document.querySelector('button[onclick="exportData()"]');
   if (exportBtn) exportBtn.style.display = 'none';
-  document.querySelector('.tipo-select-box').style.display = 'none';
+  // tipo-select-box rimosso dall'UI
   // Badge sola lettura
   const syncLabel = document.getElementById('sync-label');
   if (syncLabel && !document.querySelector('.readonly-badge')) {
@@ -919,7 +913,7 @@ window.selezionaLocale = (localeId, localeNome) => {
   if (badge) badge.remove();
   // Ripristina UI admin (nel caso fosse stata nascosta)
   document.querySelector('.add-day-zone').style.display = '';
-  document.querySelector('.tipo-select-box').style.display = '';
+  // tipo-select-box rimosso dall'UI
   const importBtn = document.querySelector('button[onclick="document.getElementById(\'import-input\').click()"]');
   if (importBtn) importBtn.style.display = '';
   const exportBtn = document.querySelector('button[onclick="exportData()"]');
