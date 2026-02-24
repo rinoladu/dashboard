@@ -1632,15 +1632,23 @@ async function faiScreenshot() {
   btn.textContent = '⏳';
   btn.disabled = true;
   try {
-    // Cattura solo la summary-grid (le card principali)
-    const el = document.getElementById('dashboard-screen');
-    const canvas = await html2canvas(el, {
-      backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg').trim() || '#0a0c0f',
+    const bg = document.body.classList.contains('light') ? '#f0f2f5' : '#0a0c0f';
+    const dashEl = document.getElementById('dashboard-screen');
+    const summaryGrid = dashEl.querySelector('.summary-grid');
+    // Scorri in cima
+    window.scrollTo(0, 0);
+    await new Promise(r => setTimeout(r, 150));
+    // Calcola altezza fino alla fine della summary-grid
+    const gridRect = summaryGrid.getBoundingClientRect();
+    const altezza = gridRect.bottom + 16;
+    const canvas = await html2canvas(dashEl, {
+      backgroundColor: bg,
       scale: 2,
       useCORS: true,
       scrollY: 0,
-      windowHeight: el.scrollHeight,
-      height: el.scrollHeight,
+      y: 0,
+      height: altezza,
+      windowHeight: altezza,
     });
     const title = document.getElementById('dash-title').textContent;
     const link = document.createElement('a');
