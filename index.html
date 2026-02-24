@@ -1189,9 +1189,10 @@ function importData(e) {
 }
 
 // ===== TEMA =====
+window.currentTheme = 'dark';
 let currentTheme = 'dark';
 
-function applyTheme(theme) {
+window.applyTheme = function applyTheme(theme) {
   currentTheme = theme;
   if (theme === 'light') {
     document.body.classList.add('light');
@@ -1206,7 +1207,7 @@ function applyTheme(theme) {
   }
 }
 
-async function toggleTheme() {
+window.toggleTheme = async function toggleTheme() {
   const nuovoTema = currentTheme === 'dark' ? 'light' : 'dark';
   applyTheme(nuovoTema);
   // Salva preferenza su Firestore
@@ -1968,7 +1969,7 @@ function apriImpostazioniObiettivo() {
     const percMarg = ultimaMensile.totImponibile > 0 ? ultimaMensile.totMargine / ultimaMensile.totImponibile : 0;
     if (percMarg > 0) {
       const bep = ultimaMensile.costiGiorn / percMarg;
-      sugEl.innerHTML = '💡 Break even calcolato dall'ultima mensile: <strong style="color:var(--accent)">' + fmt(bep) + '</strong>';
+      sugEl.innerHTML = "💡 Break even calcolato dall'ultima mensile: <strong style='color:var(--accent)'>" + fmt(bep) + '</strong>';
     } else {
       sugEl.textContent = '';
     }
