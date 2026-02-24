@@ -489,14 +489,17 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
       <option value="mensile">Mensile</option>
       <option value="annuale">Annuale</option>
     </select>
-    <select id="mese-select" style="display:none">
-      <option value="gennaio">Gennaio</option><option value="febbraio">Febbraio</option>
-      <option value="marzo">Marzo</option><option value="aprile">Aprile</option>
-      <option value="maggio">Maggio</option><option value="giugno">Giugno</option>
-      <option value="luglio">Luglio</option><option value="agosto">Agosto</option>
-      <option value="settembre">Settembre</option><option value="ottobre">Ottobre</option>
-      <option value="novembre">Novembre</option><option value="dicembre">Dicembre</option>
-    </select>
+    <div id="mese-container" style="display:none; padding: 0 1rem 0.8rem;">
+      <label style="color:var(--text3); font-size:0.75rem; font-family:'Barlow Condensed',sans-serif; font-weight:600; letter-spacing:0.1em; text-transform:uppercase;">Mese di riferimento</label>
+      <select id="mese-select" style="appearance:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:0.6rem;margin-top:0.4rem;width:100%;max-width:250px;font-size:0.9rem;font-family:'Barlow',sans-serif;display:block;">
+        <option value="gennaio">Gennaio</option><option value="febbraio">Febbraio</option>
+        <option value="marzo">Marzo</option><option value="aprile">Aprile</option>
+        <option value="maggio">Maggio</option><option value="giugno">Giugno</option>
+        <option value="luglio">Luglio</option><option value="agosto">Agosto</option>
+        <option value="settembre">Settembre</option><option value="ottobre">Ottobre</option>
+        <option value="novembre">Novembre</option><option value="dicembre">Dicembre</option>
+      </select>
+    </div>
     <div class="add-day-zone" onclick="document.getElementById('file-input').click()">
       <span style="font-size:2rem;display:block;margin-bottom:0.5rem">📊</span>
       <h3>Aggiungi chiusura</h3>
@@ -1100,7 +1103,8 @@ function switchSubtab(tipo) {
   });
   const map = { giorno: 'giornaliera', settimana: 'settimanale', mese: 'mensile', anno: 'annuale' };
   document.getElementById('periodo-select').value = map[tipo];
-  document.getElementById('mese-container').style.display = tipo === 'mese' ? 'block' : 'none';
+  const meseContainer = document.getElementById('mese-container');
+  if (meseContainer) meseContainer.style.display = tipo === 'mese' ? 'block' : 'none';
   renderGiorniList();
 }
 
@@ -1490,23 +1494,29 @@ function parseWorkbook(wb, filename, periodo, mese=null) {
       }
     }
 
-    // Assegna il valore corretto in base al tipo di chiusura
+    // Calcola giorni esatti
+    const annoRif = result.data ? new Date(result.data).getFullYear() : new Date().getFullYear();
+    const meseRif = result.data ? new Date(result.data).getMonth() : new Date().getMonth();
+    const giorniMese = new Date(annoRif, meseRif + 1, 0).getDate(); // giorni esatti del mese (es. 28 per feb)
+    const giorniAnno = (new Date(annoRif, 1, 29).getDate() === 29) ? 366 : 365; // bisestile?
+
+    // Ricava sempre una base giornaliera
+    let costiAlGiorno = 0;
+    if (costiGiorno > 0) costiAlGiorno = costiGiorno;
+    else if (costiMese > 0) costiAlGiorno = costiMese / giorniMese;
+    else if (costiAnno > 0) costiAlGiorno = costiAnno / giorniAnno;
+
+    // Applica in base al tipo
     if (periodo === 'giornaliera') {
-      if (costiGiorno > 0) result.costiGiorn = costiGiorno;
-      else if (costiMese > 0) result.costiGiorn = costiMese / 30;
-      else if (costiAnno > 0) result.costiGiorn = costiAnno / 365;
+      result.costiGiorn = costiAlGiorno;
     } else if (periodo === 'settimanale') {
-      if (costiGiorno > 0) result.costiGiorn = costiGiorno * 7;
-      else if (costiMese > 0) result.costiGiorn = costiMese / 30 * 7;
-      else if (costiAnno > 0) result.costiGiorn = costiAnno / 52;
+      result.costiGiorn = costiAlGiorno * 7;
     } else if (periodo === 'mensile') {
       if (costiMese > 0) result.costiGiorn = costiMese;
-      else if (costiGiorno > 0) result.costiGiorn = costiGiorno * 30;
-      else if (costiAnno > 0) result.costiGiorn = costiAnno / 12;
+      else result.costiGiorn = costiAlGiorno * giorniMese;
     } else if (periodo === 'annuale') {
       if (costiAnno > 0) result.costiGiorn = costiAnno;
-      else if (costiMese > 0) result.costiGiorn = costiMese * 12;
-      else if (costiGiorno > 0) result.costiGiorn = costiGiorno * 365;
+      else result.costiGiorn = costiAlGiorno * giorniAnno;
     }
   }
   if (periodo==='mensile'&&mese) {
