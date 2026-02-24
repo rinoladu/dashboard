@@ -1875,7 +1875,7 @@ function aggiornaWidgetObiettivo() {
     return d.getFullYear() === annoCorrente && d.getMonth() === meseCorrente;
   });
 
-  const  = chiusureMese.reduce((s, c) => s + (c.totImponibile || 0), 0);
+  const incassatoMese = chiusureMese.reduce((s, c) => s + (c.totImponibile || 0), 0);
 
   // Suggerimento automatico dal break even dell'ultima mensile
   const ultimaMensile = CHIUSURE.find(c => (c.tipo || '') === 'mese');
@@ -1900,14 +1900,14 @@ function aggiornaWidgetObiettivo() {
   document.getElementById('obiettivo-mese-label').textContent = nomeMesi[meseCorrente] + ' ' + annoCorrente;
 
   // Percentuale
-  const perc = target > 0 ? Math.min(150, ( / target) * 100) : 0;
+  const perc = target > 0 ? Math.min(150, (incassatoMese / target) * 100) : 0;
   const percDisplay = Math.min(100, perc);
 
   // Ring SVG (circumferenza = 2π*33 ≈ 207.3)
   const circ = 207.3;
   const offset = circ - (percDisplay / 100) * circ;
   const ring = document.getElementById('obiettivo-ring');
-  const isOver =  >= target && target > 0;
+  const isOver = incassatoMese >= target && target > 0;
 
   // Colore anello
   let ringColor, ringGlow;
@@ -1925,10 +1925,10 @@ function aggiornaWidgetObiettivo() {
   percEl.style.color = ringColor;
 
   // Valori
-  document.getElementById('obiettivo-incassato').textContent = fmt();
+  document.getElementById('obiettivo-incassato').textContent = fmt(incassatoMese);
   document.getElementById('obiettivo-target').textContent = target > 0 ? fmt(target) : '—';
 
-  const delta =  - target;
+  const delta = incassatoMese - target;
   const deltaEl = document.getElementById('obiettivo-delta');
   if (target === 0) {
     deltaEl.textContent = '—';
