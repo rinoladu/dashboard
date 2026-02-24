@@ -100,7 +100,7 @@ body::before {
   height: 60%;
   background: radial-gradient(ellipse, rgba(232,184,75,0.04) 0%, transparent 70%);
   pointer-events: none;
-  z-index: 0;
+  z-index: -1;
 }
 
 body::after {
@@ -112,7 +112,7 @@ body::after {
   height: 50%;
   background: radial-gradient(ellipse, rgba(75,157,232,0.04) 0%, transparent 70%);
   pointer-events: none;
-  z-index: 0;
+  z-index: -1;
 }
 
 /* GLASS UTILITY */
@@ -128,7 +128,7 @@ body::after {
 /* ===== LOGIN SCREEN ===== */
 #login-screen {
   display: none; flex-direction: column; align-items: center; justify-content: center;
-  min-height: 100vh; gap: 1.8rem; padding: 2rem; position: relative; z-index: 1;
+  min-height: 100vh; gap: 1.8rem; padding: 2rem;
 }
 
 .login-logo {
@@ -161,7 +161,7 @@ body::after {
 .btn-google svg { width: 20px; height: 20px; }
 
 /* ===== HOME SCREEN ===== */
-#home-screen { display: none; flex-direction: column; min-height: 100vh; position: relative; z-index: 1; }
+#home-screen { display: none; flex-direction: column; min-height: 100vh; }
 
 .home-header {
   background: rgba(7,9,12,0.85);
@@ -449,7 +449,7 @@ body.light .home-header { background: rgba(242,244,248,0.92); }
 .tipo-badge.anno { background: rgba(224,75,232,0.12); color: #e04be8; }
 
 /* LOADING */
-#loading-screen { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 1.5rem; position: relative; z-index: 1; }
+#loading-screen { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 1.5rem; }
 .spinner {
   width: 44px; height: 44px;
   border: 2px solid rgba(255,255,255,0.05);
@@ -502,7 +502,7 @@ body.light .home-header { background: rgba(242,244,248,0.92); }
 }
 
 /* DASHBOARD */
-#dashboard-screen { display: none; position: relative; z-index: 1; }
+#dashboard-screen { display: none; }
 .dash-header {
   background: rgba(7,9,12,0.85); border-bottom: 1px solid var(--border);
   padding: 0.8rem 1.2rem; display: flex; align-items: center; justify-content: space-between;
@@ -693,7 +693,7 @@ body.light .stat-table th { background: rgba(0,0,0,0.04); }
 }
 
 /* SELEZIONE LOCALE */
-#locale-screen { display: none; flex-direction: column; min-height: 100vh; position: relative; z-index: 1; }
+#locale-screen { display: none; flex-direction: column; min-height: 100vh; }
 .locale-header {
   background: rgba(7,9,12,0.85); border-bottom: 1px solid var(--border);
   padding: 1rem 1.2rem; display: flex; align-items: center; justify-content: space-between;
