@@ -1875,7 +1875,7 @@ function aggiornaWidgetObiettivo() {
     return d.getFullYear() === annoCorrente && d.getMonth() === meseCorrente;
   });
 
-  const incassatoMese = chiusureMese.reduce((s, c) => s + (c.totImponibile || 0), 0);
+  const incassatoMese = chiusureMese.reduce((s, c) => s + (c.totLordo || 0), 0);
 
   // Suggerimento automatico dal break even dell'ultima mensile
   const ultimaMensile = CHIUSURE.find(c => (c.tipo || '') === 'mese');
@@ -1966,7 +1966,7 @@ function apriImpostazioniObiettivo() {
   const ultimaMensile = CHIUSURE.find(c => (c.tipo || '') === 'mese');
   const sugEl = document.getElementById('obiettivo-suggerimento');
   if (ultimaMensile && ultimaMensile.costiGiorn > 0) {
-    const percMarg = ultimaMensile.totImponibile > 0 ? ultimaMensile.totMargine / ultimaMensile.totImponibile : 0;
+    const percMarg = ultimaMensile.totLordo > 0 ? ultimaMensile.totMargine / ultimaMensile.totLordo : 0;
     if (percMarg > 0) {
       const bep = ultimaMensile.costiGiorn / percMarg;
       sugEl.innerHTML = "💡 Break even calcolato dall'ultima mensile: <strong style='color:var(--accent)'>" + fmt(bep) + '</strong>';
