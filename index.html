@@ -578,7 +578,7 @@ body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--te
     <div class="card"><div class="card-label">Margine chiusura</div><div class="card-value green" id="s-margine">—</div></div>
     <div class="card"><div class="card-label">Margine %</div><div class="card-value green" id="s-margine-perc">—</div></div>
     <div class="card"><div class="card-label">Break Even</div><div class="card-value blue" id="s-bep">—</div></div>
-    <div class="card"><div class="card-label">Costi fissi/giorno</div><div class="card-value" id="s-costi-fissi">—</div></div>
+    <div class="card"><div class="card-label" id="s-costi-label">Costi fissi</div><div class="card-value" id="s-costi-fissi">—</div></div>
     <div class="card"><div class="card-label">Marg. effettivo</div><div class="card-value" id="s-marg-eff">—</div><div class="progress-bar-wrap"><div class="progress-bar-fill" id="s-progress" style="width:0%"></div></div></div>
     <div class="card full"><div class="card-label">Top 5 categorie per quantità</div><div id="top5-bars" style="margin-top:0.5rem"></div></div>
   </div>
@@ -992,6 +992,7 @@ const LOCALI = [
 // ===== STATO =====
 let CHIUSURE = [];
 let CURRENT_DATA = null;
+let CURRENT_TIPO = 'giorno';
 let activeChart = null;
 let selectedIds = new Set();
 
@@ -1381,10 +1382,11 @@ async function salvaNota() {
 // ===== APRI DASHBOARD =====
 function apriDashboard(data, label, tipo) {
   CURRENT_DATA = data;
+  CURRENT_TIPO = tipo;
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('dashboard-screen').style.display = 'block';
   document.getElementById('dash-title').textContent = label;
-  const tipoLabels = { giorno:'Chiusura giornaliera', settimana:'Analisi settimanale', mese:'Analisi mensile' };
+  const tipoLabels = { giorno:'Chiusura giornaliera', settimana:'Analisi settimanale', mese:'Analisi mensile', anno:'Analisi annuale' };
   document.getElementById('dash-subtitle').textContent = tipoLabels[tipo]||'';
   buildUI();
   window.scrollTo(0,0);
@@ -1475,17 +1477,45 @@ function parseWorkbook(wb, filename, periodo, mese=null) {
     }
   }
   if (wb.Sheets['COSTI']) {
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets['COSTI'],{header:1});
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets['COSTI'],{header:1, raw:true, defval:''});
+    let costiGiorno = 0, costiMese = 0, costiAnno = 0;
+
     for (let i=0;i<rows.length;i++) {
-      const r=rows[i]; if(r[0]&&String(r[0]).toLowerCase().includes('costi al gg')) { result.costiGiorn=parseFloat(r[2])||0; break; }
+      const r = rows[i];
+      const label = r[0] ? String(r[0]).toLowerCase().trim() : '';
+      // I valori sono in colonna C (indice 2), a volte in colonna B (indice 1)
+      const parseVal = v => parseFloat(String(v||'').replace(/[^0-9.,]/g,'').replace(',','.')) || 0;
+      const val = parseVal(r[2]) || parseVal(r[1]);
+
+      if (label.includes('costi al gg') || label.includes('costo al giorno') || label.includes('costi al giorno')) {
+        costiGiorno = val;
+      } else if (label.includes('costi al mese') || label.includes('costo al mese') || label.includes('costi mensili')) {
+        costiMese = val;
+      } else if (label.includes('costi annuali') || label.includes('costi al anno') || label.includes('costo annuale')) {
+        costiAnno = val;
+      }
+    }
+
+    // Assegna il valore corretto in base al tipo di chiusura
+    if (periodo === 'giornaliera') {
+      if (costiGiorno > 0) result.costiGiorn = costiGiorno;
+      else if (costiMese > 0) result.costiGiorn = costiMese / 30;
+      else if (costiAnno > 0) result.costiGiorn = costiAnno / 365;
+    } else if (periodo === 'settimanale') {
+      if (costiGiorno > 0) result.costiGiorn = costiGiorno * 7;
+      else if (costiMese > 0) result.costiGiorn = costiMese / 30 * 7;
+      else if (costiAnno > 0) result.costiGiorn = costiAnno / 52;
+    } else if (periodo === 'mensile') {
+      if (costiMese > 0) result.costiGiorn = costiMese;
+      else if (costiGiorno > 0) result.costiGiorn = costiGiorno * 30;
+      else if (costiAnno > 0) result.costiGiorn = costiAnno / 12;
+    } else if (periodo === 'annuale') {
+      if (costiAnno > 0) result.costiGiorn = costiAnno;
+      else if (costiMese > 0) result.costiGiorn = costiMese * 12;
+      else if (costiGiorno > 0) result.costiGiorn = costiGiorno * 365;
     }
   }
-  if (periodo==='settimanale') result.costiGiorn*=7;
-  if (periodo==='annuale') result.costiGiorn*=365;
   if (periodo==='mensile'&&mese) {
-    const mesiIndex={gennaio:0,febbraio:1,marzo:2,aprile:3,maggio:4,giugno:5,luglio:6,agosto:7,settembre:8,ottobre:9,novembre:10,dicembre:11};
-    const idx=mesiIndex[mese];
-    if (idx!==undefined) result.costiGiorn*=new Date(new Date().getFullYear(),idx+1,0).getDate();
     result.tipo='mese';
   }
   result.chiusura.forEach(item => {
@@ -1528,6 +1558,8 @@ function buildUI() {
   document.getElementById('s-margine').textContent=fmt(totMargine);
   document.getElementById('s-margine-perc').textContent=marginePerc.toFixed(1)+'%';
   document.getElementById('s-bep').textContent=costiGiorno>0?fmt(bep):'N/D';
+  const costiLabels = { giorno:'Costi fissi/giorno', settimana:'Costi fissi/settimana', mese:'Costi fissi/mese', anno:'Costi fissi/anno' };
+  document.getElementById('s-costi-label').textContent = costiLabels[CURRENT_TIPO] || 'Costi fissi';
   document.getElementById('s-costi-fissi').textContent=costiGiorno>0?fmt(costiGiorno):'N/D';
   const el=document.getElementById('s-marg-eff');
   el.textContent=fmt(margEff); el.className='card-value '+(margEff>=0?'green':'red');
