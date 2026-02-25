@@ -516,6 +516,42 @@ body.light .modal { background: #fff; }
 .locale-badge { font-size: 0.6rem; color: var(--text3); font-family: 'Barlow Condensed', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; }
 @media(min-width: 500px) { .locale-grid { grid-template-columns: repeat(3, 1fr); } }
 
+/* GESTIONE LOCALI */
+.btn-add-locale {
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  margin: 0 1.2rem 1.2rem;
+  background: none; border: 1.5px dashed rgba(232,184,75,0.3); color: var(--accent);
+  border-radius: 14px; padding: 1rem; cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 0.9rem; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  transition: all 0.25s; width: calc(100% - 2.4rem);
+}
+.btn-add-locale:hover { border-color: var(--accent); background: rgba(232,184,75,0.05); }
+.locale-card-actions {
+  display: flex; gap: 0.4rem; margin-top: 0.4rem;
+}
+.btn-locale-action {
+  background: none; border: 1px solid var(--border); color: var(--text3);
+  border-radius: 6px; padding: 0.2rem 0.5rem; font-size: 0.65rem;
+  font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; cursor: pointer; transition: all 0.2s;
+}
+.btn-locale-action.edit:hover { border-color: var(--accent2); color: var(--accent2); }
+.btn-locale-action.del:hover { border-color: var(--red); color: var(--red); }
+.emoji-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; margin-top: 0.5rem;
+}
+.emoji-btn {
+  background: var(--surface2); border: 2px solid transparent; border-radius: 8px;
+  font-size: 1.4rem; padding: 0.4rem; cursor: pointer; text-align: center;
+  transition: all 0.15s;
+}
+.emoji-btn:hover { border-color: var(--accent); background: rgba(232,184,75,0.08); }
+.emoji-btn.selected { border-color: var(--accent); background: rgba(232,184,75,0.12); }
+body.light .btn-add-locale { border-color: rgba(201,147,10,0.3); }
+body.light .btn-locale-action { border-color: rgba(0,0,0,0.1); color: #7a8494; }
+body.light .emoji-btn { background: #e8eaed; }
+
 /* MESE */
 #mese-container { padding: 0 1rem 0.8rem; }
 #mese-container label { color: var(--text3); font-size: 0.75rem; font-family: 'Barlow Condensed', sans-serif; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
@@ -558,6 +594,33 @@ body.light .modal { background: #fff; }
     <div style="font-size:0.85rem;color:var(--text2);margin-top:0.3rem">Scegli quale locale vuoi visualizzare</div>
   </div>
   <div class="locale-grid" id="locale-grid"></div>
+  <div id="btn-add-locale-wrap" style="display:none">
+    <button class="btn-add-locale" onclick="apriModalLocale()">＋ Aggiungi locale</button>
+  </div>
+</div>
+
+<!-- MODAL LOCALE -->
+<div class="modal-overlay" id="locale-modal-overlay" onclick="closeLocaleModalOutside(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeLocaleModal()">✕</button>
+    <div class="modal-title" id="locale-modal-title">Nuovo locale</div>
+    <div style="display:flex;flex-direction:column;gap:1rem;padding:0 0.3rem">
+      <div>
+        <label style="color:var(--text3);font-size:0.65rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;display:block;margin-bottom:0.4rem">Nome locale</label>
+        <input type="text" id="locale-nome-input" placeholder="es. Centrale, Terrazza..."
+          style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:0.8rem 1rem;font-size:1rem;font-family:'Barlow',sans-serif;outline:none;width:100%;transition:border-color 0.2s"
+          onfocus="this.style.borderColor='rgba(232,184,75,0.4)'" onblur="this.style.borderColor=''">
+      </div>
+      <div>
+        <label style="color:var(--text3);font-size:0.65rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;display:block;margin-bottom:0.4rem">Icona</label>
+        <div style="font-size:1.8rem;text-align:center;margin-bottom:0.5rem" id="locale-icona-preview">🏠</div>
+        <div class="emoji-grid" id="emoji-grid"></div>
+      </div>
+    </div>
+    <button class="btn-save-note" id="locale-modal-save" onclick="salvaLocale()" style="margin-top:1.2rem">Salva locale</button>
+    <div style="color:var(--red);font-size:0.75rem;text-align:center;margin-top:0.5rem;min-height:1rem" id="locale-modal-error"></div>
+  </div>
 </div>
 
 <!-- ===== HOME SCREEN ===== -->
@@ -947,12 +1010,17 @@ onAuthStateChanged(auth, async user => {
       localStorage.setItem(ADMIN_UID_KEY, user.uid);
       window.IS_READONLY = false;
       currentProfilo = null;
+      window._adminUid = user.uid;
+      window._db = db;
+      window._currentProfilo = null;
       // Carica tema
       try {
         const ref = doc(db, 'users', user.uid, 'preferenze', 'tema');
         const snap = await getDoc(ref);
         if (snap.exists()) applyTheme(snap.data().valore);
       } catch(e) {}
+      // Carica locali dinamici da Firestore
+      await caricaLocaliDinamici();
       mostraSchermataLocale();
     } else {
       // TITOLARE — cerca profilo
@@ -962,6 +1030,7 @@ onAuthStateChanged(auth, async user => {
         const profiloSnap = await getDoc(profiloRef);
         if (profiloSnap.exists()) {
           currentProfilo = profiloSnap.data();
+          window._currentProfilo = currentProfilo;
           // Se ha più locali mostra selezione, altrimenti entra diretto
           const locali = currentProfilo.locali || [currentProfilo.localeId];
           if (locali.length > 1) {
@@ -970,7 +1039,7 @@ onAuthStateChanged(auth, async user => {
             document.getElementById('locale-screen').style.display = 'flex';
             document.getElementById('locale-screen').style.flexDirection = 'column';
             const grid = document.getElementById('locale-grid');
-            grid.innerHTML = LOCALI.filter(l => locali.includes(l.id)).map(l => `
+            grid.innerHTML = (window.LOCALI_DINAMICI || LOCALI).filter(l => locali.includes(l.id)).map(l => `
               <div class="locale-card" onclick="selezionaLocaleReadonly('${l.id}','${l.nome}')">
                 <div class="locale-icon">${l.icona}</div>
                 <div class="locale-nome">${l.nome}</div>
@@ -1926,6 +1995,198 @@ async function faiScreenshot() {
     btn.textContent = '📸';
     btn.disabled = false;
   }
+}
+
+// ===== GESTIONE LOCALI DINAMICI =====
+const EMOJI_LOCALI = ['🏠','⭐','👑','🌊','🌳','⚓','🍕','🍔','🍺','🍷','☕','🎵','🎯','🔥','💎','🌙','🌅','🏖️','🏔️','🎪','🎭','🌺','🍀','🦁','🐯','🦅'];
+
+let localeEditId = null; // null = nuovo, stringa = modifica
+let localeIconaSelezionata = '🏠';
+
+// Carica locali da Firestore (o usa LOCALI hardcoded come fallback)
+async function caricaLocaliDinamici() {
+  const adminUid = window._adminUid;
+  if (!adminUid) return;
+  try {
+    const { collection, getDocs, doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const db = window._db;
+    const snap = await getDocs(collection(db, 'users', adminUid, 'locali_config'));
+    if (!snap.empty) {
+      // Usa locali da Firestore
+      const localiFS = [];
+      snap.forEach(d => localiFS.push({ id: d.id, ...d.data() }));
+      localiFS.sort((a, b) => (a.ordine || 0) - (b.ordine || 0));
+      window.LOCALI_DINAMICI = localiFS;
+    } else {
+      // Prima volta: salva i locali hardcoded su Firestore
+      const { setDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+      for (let i = 0; i < LOCALI.length; i++) {
+        const l = LOCALI[i];
+        await setDoc(doc(db, 'users', adminUid, 'locali_config', l.id), {
+          nome: l.nome, icona: l.icona, ordine: i
+        });
+      }
+      window.LOCALI_DINAMICI = LOCALI.map((l, i) => ({ ...l, ordine: i }));
+    }
+  } catch(e) {
+    console.error('caricaLocaliDinamici:', e);
+    window.LOCALI_DINAMICI = LOCALI;
+  }
+}
+
+function getLocaliAttivi() {
+  return window.LOCALI_DINAMICI || LOCALI;
+}
+
+// Override mostraSchermataLocale per usare locali dinamici
+const _mostraSchermataLocaleOrig = mostraSchermataLocale;
+mostraSchermataLocale = function() {
+  _mostraSchermataLocaleOrig();
+  renderLocaleGrid();
+};
+
+function renderLocaleGrid() {
+  const isAdmin = !window._currentProfilo; // null = admin
+  const locali = getLocaliAttivi();
+  const grid = document.getElementById('locale-grid');
+  
+  grid.innerHTML = locali.map(l => `
+    <div class="locale-card" onclick="selezionaLocale('${l.id}', '${l.nome}')">
+      <div class="locale-icon">${l.icona || '🏠'}</div>
+      <div class="locale-nome">${l.nome}</div>
+      ${isAdmin ? `
+        <div class="locale-card-actions" onclick="event.stopPropagation()">
+          <button class="btn-locale-action edit" onclick="apriModificaLocale('${l.id}')">✏️ Modifica</button>
+          <button class="btn-locale-action del" onclick="eliminaLocale('${l.id}', '${l.nome}')">🗑 Elimina</button>
+        </div>
+      ` : '<div class="locale-badge">Tocca per aprire</div>'}
+    </div>
+  `).join('');
+
+  // Mostra bottone aggiungi solo per admin
+  const wrap = document.getElementById('btn-add-locale-wrap');
+  if (wrap) wrap.style.display = isAdmin ? 'block' : 'none';
+}
+
+function apriModalLocale(editId = null) {
+  localeEditId = editId;
+  localeIconaSelezionata = '🏠';
+
+  const title = document.getElementById('locale-modal-title');
+  const nomeInput = document.getElementById('locale-nome-input');
+  const errEl = document.getElementById('locale-modal-error');
+
+  if (editId) {
+    const l = getLocaliAttivi().find(x => x.id === editId);
+    title.textContent = '✏️ Modifica locale';
+    nomeInput.value = l ? l.nome : '';
+    localeIconaSelezionata = l ? (l.icona || '🏠') : '🏠';
+  } else {
+    title.textContent = '＋ Nuovo locale';
+    nomeInput.value = '';
+    localeIconaSelezionata = '🏠';
+  }
+
+  errEl.textContent = '';
+  document.getElementById('locale-icona-preview').textContent = localeIconaSelezionata;
+
+  // Renderizza griglia emoji
+  document.getElementById('emoji-grid').innerHTML = EMOJI_LOCALI.map(e => `
+    <button class="emoji-btn ${e === localeIconaSelezionata ? 'selected' : ''}" onclick="selezionaEmoji('${e}')">${e}</button>
+  `).join('');
+
+  document.getElementById('locale-modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => nomeInput.focus(), 300);
+}
+
+function selezionaEmoji(e) {
+  localeIconaSelezionata = e;
+  document.getElementById('locale-icona-preview').textContent = e;
+  document.querySelectorAll('.emoji-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.textContent === e);
+  });
+}
+
+function apriModificaLocale(id) {
+  apriModalLocale(id);
+}
+
+async function salvaLocale() {
+  const nome = document.getElementById('locale-nome-input').value.trim();
+  const errEl = document.getElementById('locale-modal-error');
+
+  if (!nome) { errEl.textContent = 'Inserisci un nome per il locale'; return; }
+
+  const adminUid = window._adminUid;
+  const db = window._db;
+
+  try {
+    const { doc, setDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+
+    if (localeEditId) {
+      // Modifica
+      await updateDoc(doc(db, 'users', adminUid, 'locali_config', localeEditId), {
+        nome, icona: localeIconaSelezionata
+      });
+      // Aggiorna locale dinamico
+      const l = getLocaliAttivi().find(x => x.id === localeEditId);
+      if (l) { l.nome = nome; l.icona = localeIconaSelezionata; }
+    } else {
+      // Nuovo locale — id da nome normalizzato
+      const id = nome.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+      if (getLocaliAttivi().find(x => x.id === id)) {
+        errEl.textContent = 'Esiste già un locale con questo nome';
+        return;
+      }
+      const ordine = getLocaliAttivi().length;
+      await setDoc(doc(db, 'users', adminUid, 'locali_config', id), {
+        nome, icona: localeIconaSelezionata, ordine
+      });
+      (window.LOCALI_DINAMICI || LOCALI).push({ id, nome, icona: localeIconaSelezionata, ordine });
+    }
+
+    closeLocaleModal();
+    renderLocaleGrid();
+  } catch(e) {
+    errEl.textContent = 'Errore salvataggio: ' + e.message;
+  }
+}
+
+async function eliminaLocale(id, nome) {
+  if (!confirm(`Eliminare il locale "${nome}"?
+
+ATTENZIONE: verranno eliminati anche tutti i dati (chiusure) di questo locale.`)) return;
+
+  const adminUid = window._adminUid;
+  const db = window._db;
+
+  try {
+    const { doc, deleteDoc, collection, getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+
+    // Elimina tutte le chiusure
+    const chiusureSnap = await getDocs(collection(db, 'users', adminUid, 'locali', id, 'chiusure'));
+    for (const d of chiusureSnap.docs) {
+      await deleteDoc(doc(db, 'users', adminUid, 'locali', id, 'chiusure', d.id));
+    }
+    // Elimina config locale
+    await deleteDoc(doc(db, 'users', adminUid, 'locali_config', id));
+
+    // Rimuovi da array locale
+    window.LOCALI_DINAMICI = (window.LOCALI_DINAMICI || LOCALI).filter(l => l.id !== id);
+    renderLocaleGrid();
+  } catch(e) {
+    alert('Errore eliminazione: ' + e.message);
+  }
+}
+
+function closeLocaleModal() {
+  document.getElementById('locale-modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function closeLocaleModalOutside(e) {
+  if (e.target === document.getElementById('locale-modal-overlay')) closeLocaleModal();
 }
 
 // ===== OBIETTIVO MENSILE =====
