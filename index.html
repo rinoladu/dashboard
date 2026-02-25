@@ -392,7 +392,7 @@ body {
 .section-title { font-family: 'Barlow Condensed', sans-serif; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text3); padding: 0.5rem 1rem 0.3rem; }
 
 /* BUTTONS */
-.btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; padding: 0.5rem 1rem; }
+.btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; padding: 0.5rem 1rem; }
 .btn-stat {
   padding: 0.65rem 0.5rem; border-radius: 12px; border: 1px solid transparent;
   font-family: 'Barlow Condensed', sans-serif; font-size: 0.78rem; font-weight: 700;
@@ -729,61 +729,73 @@ body.light .modal { background: #fff; }
   <div class="section-title">Drink</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('drink-venduti')">Drink più venduti</button>
+    <button class="btn-stat blue" onclick="openModal('drink-incasso')">Drink più incasso</button>
     <button class="btn-stat orange" onclick="openModal('drink-margine')">Drink più margine</button>
   </div>
   <div class="section-title">Pizze</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('pizze-vendute')">Pizze più vendute</button>
+    <button class="btn-stat blue" onclick="openModal('pizze-incasso')">Pizze più incasso</button>
     <button class="btn-stat orange" onclick="openModal('pizze-margine')">Pizze più margine</button>
   </div>
   <div class="section-title">Primi</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('primi-venduti')">Primi più venduti</button>
+    <button class="btn-stat blue" onclick="openModal('primi-incasso')">Primi più incasso</button>
     <button class="btn-stat orange" onclick="openModal('primi-margine')">Primi più margine</button>
   </div>
   <div class="section-title">Secondi</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('secondi-venduti')">Secondi più venduti</button>
+    <button class="btn-stat blue" onclick="openModal('secondi-incasso')">Secondi più incasso</button>
     <button class="btn-stat orange" onclick="openModal('secondi-margine')">Secondi più margine</button>
   </div>
   <div class="section-title">Hamburger</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('burger-venduti')">Burger più venduti</button>
+    <button class="btn-stat blue" onclick="openModal('burger-incasso')">Burger più incasso</button>
     <button class="btn-stat orange" onclick="openModal('burger-margine')">Burger più margine</button>
   </div>
   <div class="section-title">Antipasti</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('anti-venduti')">Antipasti più venduti</button>
+    <button class="btn-stat blue" onclick="openModal('anti-incasso')">Antipasti più incasso</button>
     <button class="btn-stat orange" onclick="openModal('anti-margine')">Antipasti più margine</button>
   </div>
   <div class="section-title">Dolci</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('dolci-venduti')">Dolci più venduti</button>
+    <button class="btn-stat blue" onclick="openModal('dolci-incasso')">Dolci più incasso</button>
     <button class="btn-stat orange" onclick="openModal('dolci-margine')">Dolci più margine</button>
   </div>
   <div class="section-title">Caffetteria</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('caffe-venduti')">Caffetteria più venduta</button>
+    <button class="btn-stat blue" onclick="openModal('caffe-incasso')">Caffetteria più incasso</button>
     <button class="btn-stat orange" onclick="openModal('caffe-margine')">Caffetteria più margine</button>
   </div>
   <div class="section-title">Vini Bianchi</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('vb-venduti')">Vini bianchi più venduti</button>
+    <button class="btn-stat blue" onclick="openModal('vb-incasso')">Vini bianchi incasso</button>
     <button class="btn-stat orange" onclick="openModal('vb-margine')">Vini bianchi più margine</button>
   </div>
   <div class="section-title">Vini Rossi e Rosati</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('vr-venduti')">Vini rossi/rosati venduti</button>
+    <button class="btn-stat blue" onclick="openModal('vr-incasso')">Vini rossi incasso</button>
     <button class="btn-stat orange" onclick="openModal('vr-margine')">Vini rossi/rosati margine</button>
   </div>
   <div class="section-title">Spumanti e Prosecco</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('spu-venduti')">Spumanti più venduti</button>
+    <button class="btn-stat blue" onclick="openModal('spu-incasso')">Spumanti incasso</button>
     <button class="btn-stat orange" onclick="openModal('spu-margine')">Spumanti più margine</button>
   </div>
   <div class="section-title">Birre</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('birre-vendute')">Birre più vendute</button>
+    <button class="btn-stat blue" onclick="openModal('birre-incasso')">Birre più incasso</button>
     <button class="btn-stat orange" onclick="openModal('birre-margine')">Birre più margine</button>
   </div>
   <div style="height:2rem"></div>
@@ -1822,6 +1834,18 @@ function getModalConfig(type){
     'spu-margine':()=>buildMarginConfig('🍾 Spumanti per Margine',filterGroupByMargine(['--SPUMANTI E PROSECCHI--'],'prodotto',N)),
     'birre-vendute':()=>buildBarConfig('🍺 Birre più Vendute',filterGroupBy(['--BIRRE--'],'prodotto','qty',N),'qty','pezzi','blue'),
     'birre-margine':()=>buildMarginConfig('🍺 Birre per Margine',filterGroupByMargine(['--BIRRE--'],'prodotto',N)),
+    'drink-incasso':()=>buildBarConfig('🍹 Drink per Incasso',filterGroupBy(['--APERITIVI--','--COCKTAIL--','--GIN--','--EGO DRINKS--','--GRAPPE--','--RUM--','--TEQUILA--','--WHISKEY--'],'prodotto','totale',N),'totale','€','gold'),
+    'pizze-incasso':()=>buildBarConfig('🍕 Pizze per Incasso',filterGroupBy(['--PIZZE CLASSICHE--','--PIZZE CREATIVE--','--PIZZE DOLCI--'],'prodotto','totale',N),'totale','€','gold'),
+    'primi-incasso':()=>buildBarConfig('🍝 Primi per Incasso',filterGroupBy(['--PRIMI--'],'prodotto','totale',N),'totale','€','gold'),
+    'secondi-incasso':()=>buildBarConfig('🥩 Secondi per Incasso',filterGroupBy(['--SECONDI--'],'prodotto','totale',N),'totale','€','gold'),
+    'burger-incasso':()=>buildBarConfig('🍔 Burger per Incasso',filterGroupBy(['--BURGER MENU--'],'prodotto','totale',N),'totale','€','gold'),
+    'anti-incasso':()=>buildBarConfig('🫒 Antipasti per Incasso',filterGroupBy(['--ANTIPASTI--'],'prodotto','totale',N),'totale','€','gold'),
+    'dolci-incasso':()=>buildBarConfig('🍰 Dolci per Incasso',filterGroupBy(['--DOLCI--'],'prodotto','totale',N),'totale','€','gold'),
+    'caffe-incasso':()=>buildBarConfig('☕ Caffetteria per Incasso',filterGroupBy(['--CAFFETTERIA--'],'prodotto','totale',N),'totale','€','gold'),
+    'vb-incasso':()=>buildBarConfig('🥂 Vini Bianchi per Incasso',filterGroupBy(['--VINI BIANCHI--'],'prodotto','totale',N),'totale','€','gold'),
+    'vr-incasso':()=>buildBarConfig('🍷 Vini Rossi/Rosati per Incasso',filterGroupBy(['--VINI ROSSI E ROSATI--'],'prodotto','totale',N),'totale','€','gold'),
+    'spu-incasso':()=>buildBarConfig('🍾 Spumanti per Incasso',filterGroupBy(['--SPUMANTI E PROSECCHI--'],'prodotto','totale',N),'totale','€','gold'),
+    'birre-incasso':()=>buildBarConfig('🍺 Birre per Incasso',filterGroupBy(['--BIRRE--'],'prodotto','totale',N),'totale','€','gold'),
   };
   const fn=configs[type];
   if(!fn) return{title:'N/D',html:'<div class="no-data">Dati non disponibili</div>'};
