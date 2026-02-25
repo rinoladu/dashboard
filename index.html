@@ -52,6 +52,47 @@ body.light .mini-bar-fill { color: #fff; }
 body.light .btn-note.has-note { background: #fef3c7; }
 body.light .modal { background: var(--surface); }
 body.light .giorno-card { background: #fff; }
+body.light .subtabs { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.08); }
+body.light .subtab { color: #7a8494; }
+body.light .subtab.active { color: var(--accent2); }
+body.light .tabs { background: rgba(240,242,245,0.95); }
+body.light .tab { color: #7a8494; }
+body.light .tab.active { color: var(--accent); }
+body.light .search-input { background: #fff; border-color: rgba(0,0,0,0.12); color: #0a0c0f; }
+body.light .sort-select { background: #fff; border-color: rgba(0,0,0,0.12); color: #3a4250; }
+body.light .btn-quick { background: #e8eaed; border-color: rgba(0,0,0,0.1); color: #3a4250; }
+body.light .btn-quick:hover { background: #dbeafe; color: #1a6fc4; border-color: #93c5fd; }
+body.light .totali-bar { background: #fff; border-color: rgba(0,0,0,0.08); }
+body.light .totali-item .t-label { color: #7a8494; }
+body.light .totali-item .t-value { color: #3a4250; }
+body.light .section-title { color: #7a8494; }
+body.light .stat-table td { color: #3a4250; border-color: rgba(0,0,0,0.06); }
+body.light .stat-table td:first-child { color: #0a0c0f; }
+body.light .chart-container canvas { filter: none; }
+body.light .add-day-zone { background: #fff; border-color: rgba(0,0,0,0.12); }
+body.light .add-day-zone h3 { color: #3a4250; }
+body.light .add-day-zone p { color: #7a8494; }
+body.light .empty-state h3 { color: #3a4250; }
+body.light .dash-title { background: linear-gradient(135deg, #c9930a, #e8b84b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+body.light .modal-title { background: linear-gradient(135deg, #c9930a, #e8b84b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+body.light .btn-stat.blue { background: #dbeafe; color: #1a6fc4; border-color: #93c5fd; }
+body.light .btn-stat.orange { background: #fef3c7; color: #c9930a; border-color: #fcd34d; }
+body.light .obiettivo-widget { background: #fff; border-color: rgba(0,0,0,0.08); }
+body.light .obiettivo-label { color: #7a8494; }
+body.light .obiettivo-ring-bg { stroke: rgba(0,0,0,0.08); }
+body.light .obiettivo-track { background: rgba(0,0,0,0.06); }
+body.light .locale-card { background: #fff; border-color: rgba(0,0,0,0.08); }
+body.light .locale-nome { color: #0a0c0f; }
+body.light .locale-badge { color: #7a8494; }
+body.light .locale-header { background: rgba(240,242,245,0.95); border-color: rgba(0,0,0,0.08); }
+body.light .no-data { color: #7a8494; }
+body.light .modal { background: #fff; border-color: rgba(0,0,0,0.08); }
+body.light .modal-handle { background: rgba(0,0,0,0.12); }
+body.light .note-area { background: #f0f2f5; border-color: rgba(0,0,0,0.1); }
+body.light .btn-note { border-color: rgba(0,0,0,0.1); color: #7a8494; }
+body.light .giorno-date { color: #0a0c0f; }
+body.light .giorno-stat { color: #7a8494; }
+body.light .giorno-stat span { color: #3a4250; }
 body.light .giorno-card:hover { border-color: var(--accent); box-shadow: 0 4px 20px rgba(201,147,10,0.12); }
 body.light .card { background: #fff; }
 body.light .locale-card { background: #fff; }
@@ -492,7 +533,7 @@ body.light .modal { background: #fff; }
 <!-- ===== SELEZIONE LOCALE (solo admin) ===== -->
 <div id="locale-screen">
   <div class="locale-header">
-    <div class="app-logo">EGO</div>
+    <div class="app-logo" id="locale-logo">Dashboard</div>
     <div class="home-actions">
       <button class="btn-sm btn-theme" onclick="toggleTheme()" id="btn-theme-locale" title="Cambia tema">🌙</button>
       <button class="btn-sm logout" onclick="logoutUtente()">👤 <span class="btn-label">Esci</span></button>
@@ -1280,7 +1321,7 @@ function renderGiorniList() {
   if (tuttiTipo.length) {
     const n = tuttiTipo.length;
     const totInc = tuttiTipo.reduce((s,c) => s+(c.totImponibile||0), 0);
-    const totLordo = totInc * 1.10;
+    const totLordo = tuttiTipo.reduce((s,c)=>s+(c.totLordo||(c.totImponibile||0)*1.10),0);
     const totMarg = tuttiTipo.reduce((s,c) => s+(c.totMargine||0), 0);
     const totMargEff = tuttiTipo.reduce((s,c) => s+(c.margEff||0), 0);
     const margPercMedia = totInc > 0 ? (totMarg / totInc * 100) : 0;
@@ -1438,7 +1479,12 @@ function apriAnalisi() {
   if (!selectedIds.size) return;
   const giorni = CHIUSURE.filter(c=>selectedIds.has(c.id));
   const n = giorni.length;
-  const merged = { chiusura: giorni.flatMap(g=>g.chiusura), foodDrinkCost: giorni[0].foodDrinkCost, costiGiorn: giorni[0].costiGiorn*n };
+  // Somma coperti da tutte le chiusure (crea righe aggregate)
+  const tuttiCoperti = giorni.flatMap(g => g.chiusura.filter(r => r.cat==='--CLIENTE--' && r.prodotto && r.prodotto.toUpperCase().includes('COPERTO')));
+  const totCopertiAgg = tuttiCoperti.reduce((s,r) => s + (r.qty||0), 0);
+  const chiusuraAgg = giorni.flatMap(g => g.chiusura.filter(r => !(r.cat==='--CLIENTE--' && r.prodotto && r.prodotto.toUpperCase().includes('COPERTO'))));
+  if (totCopertiAgg > 0) chiusuraAgg.push({ cat:'--CLIENTE--', prodotto:'COPERTO', qty: totCopertiAgg, totale:0, imponibile:0, costoUnit:0, costoTot:0, margineEuro:0, marginePerc:0 });
+  const merged = { chiusura: chiusuraAgg, foodDrinkCost: giorni[0].foodDrinkCost, costiGiorn: giorni[0].costiGiorn*n };
   const tipo = n===1?'giorno':n<=7?'settimana':'mese';
   const label = n===1?formatDate(giorni[0].data):`${formatDate(giorni[n-1].data)} → ${formatDate(giorni[0].data)} (${n} giorni)`;
   apriDashboard(merged, label, tipo);
@@ -1655,6 +1701,7 @@ function parseWorkbook(wb, filename, periodo, mese=null) {
     item.marginePerc=item.imponibile>0?(item.margineEuro/item.imponibile)*100:0;
   });
   result.totImponibile=result.chiusura.reduce((s,r)=>s+r.imponibile,0);
+  result.totLordo=result.totImponibile*1.10;
   result.totMargine=result.chiusura.reduce((s,r)=>s+r.margineEuro,0);
   result.margEff=result.totMargine-result.costiGiorn;
   const dm=(result.filename||'').match(/(\d{1,2})[-_\/](\d{1,2})[-_\/](\d{2,4})/);
@@ -1677,7 +1724,7 @@ function buildUI() {
   // Coperti
   const copertiRow=d.chiusura.find(r=>r.cat==='--CLIENTE--'&&r.prodotto&&r.prodotto.toUpperCase().includes('COPERTO'));
   const coperti=copertiRow?Math.round(copertiRow.qty):null;
-  const incPerCoperto=coperti&&coperti>0?totImponibile/coperti:null;
+  const incPerCoperto=coperti&&coperti>0?totLordo/coperti:null;
   document.getElementById('s-coperti').textContent=coperti!==null?coperti+' pax':'N/D';
   document.getElementById('s-inc-coperto').textContent=incPerCoperto!==null?fmt(incPerCoperto):'N/D';
   animateValue(document.getElementById('s-lordo'), totLordo);
@@ -1875,14 +1922,14 @@ function aggiornaWidgetObiettivo() {
     return d.getFullYear() === annoCorrente && d.getMonth() === meseCorrente;
   });
 
-  const incassatoMese = chiusureMese.reduce((s, c) => s + (c.totImponibile || 0), 0);
+  const incassatoMese = chiusureMese.reduce((s, c) => s + (c.totLordo || (c.totImponibile||0)*1.10), 0);
 
   // Suggerimento automatico dal break even dell'ultima mensile
   const ultimaMensile = CHIUSURE.find(c => (c.tipo || '') === 'mese');
   let breakEvenAuto = 0;
   if (ultimaMensile && ultimaMensile.costiGiorn > 0) {
-    // costiGiorn per mensile = costi del mese
-    const percMarg = ultimaMensile.totImponibile > 0 ? ultimaMensile.totMargine / ultimaMensile.totImponibile : 0;
+    const lordoMensile = (ultimaMensile.totImponibile || 0) * 1.10;
+    const percMarg = lordoMensile > 0 ? ultimaMensile.totMargine / lordoMensile : 0;
     if (percMarg > 0) breakEvenAuto = ultimaMensile.costiGiorn / percMarg;
   }
 
