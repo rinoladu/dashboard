@@ -926,7 +926,7 @@ body.light .emoji-btn { background: #e8eaed; }
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, query, orderBy }
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, query, orderBy, updateDoc }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -945,6 +945,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
+// Esponi firestore helpers per script non-modulo
+window._firestore = { doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, collection, query, orderBy, onSnapshot };
+
 
 let currentUser = null;
 let currentProfilo = null; // null = admin, altrimenti { nome, localeUid }
@@ -1019,8 +1022,28 @@ onAuthStateChanged(auth, async user => {
         const snap = await getDoc(ref);
         if (snap.exists()) applyTheme(snap.data().valore);
       } catch(e) {}
-      // Carica locali dinamici da Firestore
-      await caricaLocaliDinamici();
+      // Carica locali da Firestore
+      try {
+        const snap = await getDocs(collection(db, 'users', user.uid, 'locali_config'));
+        if (!snap.empty) {
+          const localiFS = [];
+          snap.forEach(d => localiFS.push({ id: d.id, ...d.data() }));
+          localiFS.sort((a, b) => (a.ordine || 0) - (b.ordine || 0));
+          window.LOCALI_DINAMICI = localiFS;
+        } else {
+          // Prima volta: migra i locali hardcoded su Firestore
+          for (let i = 0; i < LOCALI.length; i++) {
+            const l = LOCALI[i];
+            await setDoc(doc(db, 'users', user.uid, 'locali_config', l.id), {
+              nome: l.nome, icona: l.icona, ordine: i
+            });
+          }
+          window.LOCALI_DINAMICI = LOCALI.map((l, i) => ({ ...l, ordine: i }));
+        }
+      } catch(e) {
+        console.error('Carica locali:', e);
+        window.LOCALI_DINAMICI = LOCALI;
+      }
       mostraSchermataLocale();
     } else {
       // TITOLARE — cerca profilo
@@ -1148,18 +1171,10 @@ function mostraSchermataLocale() {
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('locale-screen').style.display = 'flex';
   document.getElementById('locale-screen').style.flexDirection = 'column';
-  // Aggiorna tema bottone
   const btnThemeLocale = document.getElementById('btn-theme-locale');
   if (btnThemeLocale) btnThemeLocale.textContent = currentTheme === 'light' ? '☀️' : '🌙';
-  // Renderizza le card dei locali
-  const grid = document.getElementById('locale-grid');
-  grid.innerHTML = LOCALI.map(l => `
-    <div class="locale-card" onclick="selezionaLocale('${l.id}', '${l.nome}')">
-      <div class="locale-icon">${l.icona}</div>
-      <div class="locale-nome">${l.nome}</div>
-      <div class="locale-badge">Tocca per aprire</div>
-    </div>
-  `).join('');
+  // Usa renderLocaleGrid dal secondo script
+  if (typeof renderLocaleGrid === 'function') renderLocaleGrid();
 }
 
 window.selezionaLocale = (localeId, localeNome) => {
@@ -2000,56 +2015,19 @@ async function faiScreenshot() {
 // ===== GESTIONE LOCALI DINAMICI =====
 const EMOJI_LOCALI = ['🏠','⭐','👑','🌊','🌳','⚓','🍕','🍔','🍺','🍷','☕','🎵','🎯','🔥','💎','🌙','🌅','🏖️','🏔️','🎪','🎭','🌺','🍀','🦁','🐯','🦅'];
 
-let localeEditId = null; // null = nuovo, stringa = modifica
+let localeEditId = null;
 let localeIconaSelezionata = '🏠';
-
-// Carica locali da Firestore (o usa LOCALI hardcoded come fallback)
-async function caricaLocaliDinamici() {
-  const adminUid = window._adminUid;
-  if (!adminUid) return;
-  try {
-    const { collection, getDocs, doc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-    const db = window._db;
-    const snap = await getDocs(collection(db, 'users', adminUid, 'locali_config'));
-    if (!snap.empty) {
-      // Usa locali da Firestore
-      const localiFS = [];
-      snap.forEach(d => localiFS.push({ id: d.id, ...d.data() }));
-      localiFS.sort((a, b) => (a.ordine || 0) - (b.ordine || 0));
-      window.LOCALI_DINAMICI = localiFS;
-    } else {
-      // Prima volta: salva i locali hardcoded su Firestore
-      const { setDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-      for (let i = 0; i < LOCALI.length; i++) {
-        const l = LOCALI[i];
-        await setDoc(doc(db, 'users', adminUid, 'locali_config', l.id), {
-          nome: l.nome, icona: l.icona, ordine: i
-        });
-      }
-      window.LOCALI_DINAMICI = LOCALI.map((l, i) => ({ ...l, ordine: i }));
-    }
-  } catch(e) {
-    console.error('caricaLocaliDinamici:', e);
-    window.LOCALI_DINAMICI = LOCALI;
-  }
-}
 
 function getLocaliAttivi() {
   return window.LOCALI_DINAMICI || LOCALI;
 }
 
-// Override mostraSchermataLocale per usare locali dinamici
-const _mostraSchermataLocaleOrig = mostraSchermataLocale;
-mostraSchermataLocale = function() {
-  _mostraSchermataLocaleOrig();
-  renderLocaleGrid();
-};
-
 function renderLocaleGrid() {
-  const isAdmin = !window._currentProfilo; // null = admin
+  const isAdmin = !window._currentProfilo;
   const locali = getLocaliAttivi();
   const grid = document.getElementById('locale-grid');
-  
+  if (!grid) return;
+
   grid.innerHTML = locali.map(l => `
     <div class="locale-card" onclick="selezionaLocale('${l.id}', '${l.nome}')">
       <div class="locale-icon">${l.icona || '🏠'}</div>
@@ -2063,7 +2041,6 @@ function renderLocaleGrid() {
     </div>
   `).join('');
 
-  // Mostra bottone aggiungi solo per admin
   const wrap = document.getElementById('btn-add-locale-wrap');
   if (wrap) wrap.style.display = isAdmin ? 'block' : 'none';
 }
@@ -2089,8 +2066,6 @@ function apriModalLocale(editId = null) {
 
   errEl.textContent = '';
   document.getElementById('locale-icona-preview').textContent = localeIconaSelezionata;
-
-  // Renderizza griglia emoji
   document.getElementById('emoji-grid').innerHTML = EMOJI_LOCALI.map(e => `
     <button class="emoji-btn ${e === localeIconaSelezionata ? 'selected' : ''}" onclick="selezionaEmoji('${e}')">${e}</button>
   `).join('');
@@ -2100,96 +2075,90 @@ function apriModalLocale(editId = null) {
   setTimeout(() => nomeInput.focus(), 300);
 }
 
+window.apriModalLocale = apriModalLocale;
+
 function selezionaEmoji(e) {
   localeIconaSelezionata = e;
   document.getElementById('locale-icona-preview').textContent = e;
   document.querySelectorAll('.emoji-btn').forEach(btn => {
-    btn.classList.toggle('selected', btn.textContent === e);
+    btn.classList.toggle('selected', btn.textContent.trim() === e);
   });
 }
+window.selezionaEmoji = selezionaEmoji;
 
-function apriModificaLocale(id) {
-  apriModalLocale(id);
-}
+function apriModificaLocale(id) { apriModalLocale(id); }
+window.apriModificaLocale = apriModificaLocale;
 
-async function salvaLocale() {
+window.salvaLocale = async function() {
   const nome = document.getElementById('locale-nome-input').value.trim();
   const errEl = document.getElementById('locale-modal-error');
-
   if (!nome) { errEl.textContent = 'Inserisci un nome per il locale'; return; }
 
   const adminUid = window._adminUid;
   const db = window._db;
+  if (!adminUid || !db) { errEl.textContent = 'Sessione non valida, riaccedi'; return; }
 
   try {
-    const { doc, setDoc, updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const { doc, setDoc, updateDoc, collection, getDocs } = window._firestore;
 
     if (localeEditId) {
-      // Modifica
       await updateDoc(doc(db, 'users', adminUid, 'locali_config', localeEditId), {
         nome, icona: localeIconaSelezionata
       });
-      // Aggiorna locale dinamico
       const l = getLocaliAttivi().find(x => x.id === localeEditId);
       if (l) { l.nome = nome; l.icona = localeIconaSelezionata; }
     } else {
-      // Nuovo locale — id da nome normalizzato
       const id = nome.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
       if (getLocaliAttivi().find(x => x.id === id)) {
-        errEl.textContent = 'Esiste già un locale con questo nome';
-        return;
+        errEl.textContent = 'Esiste già un locale con questo nome'; return;
       }
       const ordine = getLocaliAttivi().length;
       await setDoc(doc(db, 'users', adminUid, 'locali_config', id), {
         nome, icona: localeIconaSelezionata, ordine
       });
-      (window.LOCALI_DINAMICI || LOCALI).push({ id, nome, icona: localeIconaSelezionata, ordine });
+      if (!window.LOCALI_DINAMICI) window.LOCALI_DINAMICI = [...LOCALI];
+      window.LOCALI_DINAMICI.push({ id, nome, icona: localeIconaSelezionata, ordine });
     }
 
     closeLocaleModal();
     renderLocaleGrid();
   } catch(e) {
-    errEl.textContent = 'Errore salvataggio: ' + e.message;
+    errEl.textContent = 'Errore: ' + e.message;
   }
-}
+};
 
-async function eliminaLocale(id, nome) {
-  if (!confirm(`Eliminare il locale "${nome}"?
-
-ATTENZIONE: verranno eliminati anche tutti i dati (chiusure) di questo locale.`)) return;
+window.eliminaLocale = async function(id, nome) {
+  if (!confirm('Eliminare "' + nome + '"?\n\nATTENZIONE: verranno eliminati anche tutti i dati di questo locale.')) return;
 
   const adminUid = window._adminUid;
   const db = window._db;
 
   try {
-    const { doc, deleteDoc, collection, getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-
-    // Elimina tutte le chiusure
+    const { doc, deleteDoc, collection, getDocs } = window._firestore;
     const chiusureSnap = await getDocs(collection(db, 'users', adminUid, 'locali', id, 'chiusure'));
     for (const d of chiusureSnap.docs) {
       await deleteDoc(doc(db, 'users', adminUid, 'locali', id, 'chiusure', d.id));
     }
-    // Elimina config locale
     await deleteDoc(doc(db, 'users', adminUid, 'locali_config', id));
-
-    // Rimuovi da array locale
-    window.LOCALI_DINAMICI = (window.LOCALI_DINAMICI || LOCALI).filter(l => l.id !== id);
+    window.LOCALI_DINAMICI = getLocaliAttivi().filter(l => l.id !== id);
     renderLocaleGrid();
   } catch(e) {
     alert('Errore eliminazione: ' + e.message);
   }
-}
+};
 
 function closeLocaleModal() {
   document.getElementById('locale-modal-overlay').classList.remove('open');
   document.body.style.overflow = '';
 }
+window.closeLocaleModal = closeLocaleModal;
 
 function closeLocaleModalOutside(e) {
   if (e.target === document.getElementById('locale-modal-overlay')) closeLocaleModal();
 }
+window.closeLocaleModalOutside = closeLocaleModalOutside;
 
-// ===== OBIETTIVO MENSILE =====
+// ===== OBIETTIVO MENSILE =====// ===== OBIETTIVO MENSILE =====
 const OBIETTIVO_KEY = 'ego_obiettivo_';
 
 function getObiettivoKey() {
