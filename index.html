@@ -41,6 +41,7 @@ body.light {
 }
 body.light .btn-stat.blue { background: #dbeafe; color: #1a6fc4; border-color: #93c5fd; }
 body.light .btn-stat.orange { background: #fef3c7; color: #c9930a; border-color: #fcd34d; }
+body.light .btn-stat.green { background: #dcfce7; color: #16a34a; border-color: #86efac; }
 body.light .tipo-badge.giorno { background: #dbeafe; color: #1a6fc4; }
 body.light .tipo-badge.settimana { background: #ede9fe; color: #7c3aed; }
 body.light .tipo-badge.mese { background: #dcfce7; color: #16a34a; }
@@ -77,6 +78,7 @@ body.light .dash-title { background: linear-gradient(135deg, #c9930a, #e8b84b); 
 body.light .modal-title { background: linear-gradient(135deg, #c9930a, #e8b84b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 body.light .btn-stat.blue { background: #dbeafe; color: #1a6fc4; border-color: #93c5fd; }
 body.light .btn-stat.orange { background: #fef3c7; color: #c9930a; border-color: #fcd34d; }
+body.light .btn-stat.green { background: #dcfce7; color: #16a34a; border-color: #86efac; }
 body.light .obiettivo-widget { background: #fff; border-color: rgba(0,0,0,0.08); }
 body.light .obiettivo-label { color: #7a8494; }
 body.light .obiettivo-ring-bg { stroke: rgba(0,0,0,0.08); }
@@ -402,6 +404,8 @@ body {
 .btn-stat.blue { background: rgba(75,157,232,0.12); color: var(--accent2); border-color: rgba(75,157,232,0.2); }
 .btn-stat.blue:hover { background: rgba(75,157,232,0.2); border-color: var(--accent2); transform: translateY(-1px); }
 .btn-stat.orange { background: rgba(232,184,75,0.12); color: var(--accent); border-color: rgba(232,184,75,0.2); }
+.btn-stat.green { background: rgba(61,214,140,0.12); color: var(--green); border-color: rgba(61,214,140,0.2); }
+.btn-stat.green:hover { background: rgba(61,214,140,0.2); border-color: var(--green); transform: translateY(-1px); }
 .btn-stat.orange:hover { background: rgba(232,184,75,0.2); border-color: var(--accent); transform: translateY(-1px); }
 .btn-stat.full { grid-column: 1 / -1; }
 
@@ -729,73 +733,73 @@ body.light .modal { background: #fff; }
   <div class="section-title">Drink</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('drink-venduti')">Drink più venduti</button>
-    <button class="btn-stat blue" onclick="openModal('drink-incasso')">Drink più incasso</button>
+    <button class="btn-stat green" onclick="openModal('drink-incasso')">Drink più incasso</button>
     <button class="btn-stat orange" onclick="openModal('drink-margine')">Drink più margine</button>
   </div>
   <div class="section-title">Pizze</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('pizze-vendute')">Pizze più vendute</button>
-    <button class="btn-stat blue" onclick="openModal('pizze-incasso')">Pizze più incasso</button>
+    <button class="btn-stat green" onclick="openModal('pizze-incasso')">Pizze più incasso</button>
     <button class="btn-stat orange" onclick="openModal('pizze-margine')">Pizze più margine</button>
   </div>
   <div class="section-title">Primi</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('primi-venduti')">Primi più venduti</button>
-    <button class="btn-stat blue" onclick="openModal('primi-incasso')">Primi più incasso</button>
+    <button class="btn-stat green" onclick="openModal('primi-incasso')">Primi più incasso</button>
     <button class="btn-stat orange" onclick="openModal('primi-margine')">Primi più margine</button>
   </div>
   <div class="section-title">Secondi</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('secondi-venduti')">Secondi più venduti</button>
-    <button class="btn-stat blue" onclick="openModal('secondi-incasso')">Secondi più incasso</button>
+    <button class="btn-stat green" onclick="openModal('secondi-incasso')">Secondi più incasso</button>
     <button class="btn-stat orange" onclick="openModal('secondi-margine')">Secondi più margine</button>
   </div>
   <div class="section-title">Hamburger</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('burger-venduti')">Burger più venduti</button>
-    <button class="btn-stat blue" onclick="openModal('burger-incasso')">Burger più incasso</button>
+    <button class="btn-stat green" onclick="openModal('burger-incasso')">Burger più incasso</button>
     <button class="btn-stat orange" onclick="openModal('burger-margine')">Burger più margine</button>
   </div>
   <div class="section-title">Antipasti</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('anti-venduti')">Antipasti più venduti</button>
-    <button class="btn-stat blue" onclick="openModal('anti-incasso')">Antipasti più incasso</button>
+    <button class="btn-stat green" onclick="openModal('anti-incasso')">Antipasti più incasso</button>
     <button class="btn-stat orange" onclick="openModal('anti-margine')">Antipasti più margine</button>
   </div>
   <div class="section-title">Dolci</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('dolci-venduti')">Dolci più venduti</button>
-    <button class="btn-stat blue" onclick="openModal('dolci-incasso')">Dolci più incasso</button>
+    <button class="btn-stat green" onclick="openModal('dolci-incasso')">Dolci più incasso</button>
     <button class="btn-stat orange" onclick="openModal('dolci-margine')">Dolci più margine</button>
   </div>
   <div class="section-title">Caffetteria</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('caffe-venduti')">Caffetteria più venduta</button>
-    <button class="btn-stat blue" onclick="openModal('caffe-incasso')">Caffetteria più incasso</button>
+    <button class="btn-stat green" onclick="openModal('caffe-incasso')">Caffetteria più incasso</button>
     <button class="btn-stat orange" onclick="openModal('caffe-margine')">Caffetteria più margine</button>
   </div>
   <div class="section-title">Vini Bianchi</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('vb-venduti')">Vini bianchi più venduti</button>
-    <button class="btn-stat blue" onclick="openModal('vb-incasso')">Vini bianchi incasso</button>
+    <button class="btn-stat green" onclick="openModal('vb-incasso')">Vini bianchi incasso</button>
     <button class="btn-stat orange" onclick="openModal('vb-margine')">Vini bianchi più margine</button>
   </div>
   <div class="section-title">Vini Rossi e Rosati</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('vr-venduti')">Vini rossi/rosati venduti</button>
-    <button class="btn-stat blue" onclick="openModal('vr-incasso')">Vini rossi incasso</button>
+    <button class="btn-stat green" onclick="openModal('vr-incasso')">Vini rossi incasso</button>
     <button class="btn-stat orange" onclick="openModal('vr-margine')">Vini rossi/rosati margine</button>
   </div>
   <div class="section-title">Spumanti e Prosecco</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('spu-venduti')">Spumanti più venduti</button>
-    <button class="btn-stat blue" onclick="openModal('spu-incasso')">Spumanti incasso</button>
+    <button class="btn-stat green" onclick="openModal('spu-incasso')">Spumanti incasso</button>
     <button class="btn-stat orange" onclick="openModal('spu-margine')">Spumanti più margine</button>
   </div>
   <div class="section-title">Birre</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('birre-vendute')">Birre più vendute</button>
-    <button class="btn-stat blue" onclick="openModal('birre-incasso')">Birre più incasso</button>
+    <button class="btn-stat green" onclick="openModal('birre-incasso')">Birre più incasso</button>
     <button class="btn-stat orange" onclick="openModal('birre-margine')">Birre più margine</button>
   </div>
   <div style="height:2rem"></div>
