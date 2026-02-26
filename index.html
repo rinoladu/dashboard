@@ -803,6 +803,10 @@ body.light .emoji-btn { background: #e8eaed; }
     <button class="btn-stat blue full" onclick="openModal('cat-incasso')">💶 Cat. più incasso</button>
     <button class="btn-stat orange full" onclick="openModal('cat-margine')">📈 Cat. più margine</button>
   </div>
+  <!-- CATEGORIE DINAMICHE DAL FILE -->
+  <div id="dash-cat-buttons"></div>
+
+  <div class="section-title" style="opacity:0.4;font-size:0.6rem">— categorie fisse —</div>
   <div class="section-title">Drink</div>
   <div class="btn-grid">
     <button class="btn-stat blue" onclick="openModal('drink-venduti')">Drink più venduti</button>
@@ -1807,7 +1811,7 @@ function parseWorkbook(wb, filename, periodo, mese=null) {
     const fd=result.foodDrinkCost[k];
     item.costoUnit=fd?fd.costoUnit:0;
     item.costoTot=item.costoUnit*item.qty;
-    item.margineEuro=item.costoTot===0?0:item.imponibile-item.costoTot;
+    item.margineEuro=item.costoTot===0?item.imponibile:item.imponibile-item.costoTot;
     item.marginePerc=item.imponibile>0?(item.margineEuro/item.imponibile)*100:0;
   });
   result.totImponibile=result.chiusura.reduce((s,r)=>s+r.imponibile,0);
@@ -1818,6 +1822,63 @@ function parseWorkbook(wb, filename, periodo, mese=null) {
   if(dm){const[,d,m,y]=dm;const yr=y.length===2?'20'+y:y;result.data=`${yr}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;}
   result.id=result.data+'_'+result.filename.replace(/[^a-z0-9]/gi,'');
   return result;
+}
+
+// ===== CATEGORIE DINAMICHE =====
+// Raggruppa categorie presenti nei dati correnti (escluse quelle di servizio)
+const CAT_ESCLUSE_DASH = ['--CLIENTE--', 'SERVIZIO'];
+
+function getCategoriePresenti() {
+  if (!CURRENT_DATA) return {};
+  const cats = {};
+  CURRENT_DATA.chiusura.forEach(r => {
+    if (!CAT_ESCLUSE_DASH.some(e => r.cat.includes(e.replace(/--/g,'').trim()) || r.cat === e)) {
+      if (!cats[r.cat]) cats[r.cat] = 0;
+      cats[r.cat] += r.qty || 0;
+    }
+  });
+  return cats;
+}
+
+function buildDashboardButtons() {
+  const container = document.getElementById('dash-cat-buttons');
+  if (!container) return;
+  const cats = getCategoriePresenti();
+  const sorted = Object.entries(cats).sort((a,b) => b[1]-a[1]);
+  if (!sorted.length) { container.innerHTML = ''; return; }
+
+  container.innerHTML = sorted.map(([cat]) => {
+    const id = cat.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+    const label = cat.replace(/--/g,'').trim();
+    return `
+      <div class="section-title">${label}</div>
+      <div class="btn-grid">
+        <button class="btn-stat blue" onclick="openModalDyn('venduti','${cat.replace(/'/g,"\'")}','${label}')">Più venduti</button>
+        <button class="btn-stat green" onclick="openModalDyn('incasso','${cat.replace(/'/g,"\'")}','${label}')">Più incasso</button>
+        <button class="btn-stat orange" onclick="openModalDyn('margine','${cat.replace(/'/g,"\'")}','${label}')">Più margine</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function openModalDyn(tipo, cat, label) {
+  const N = 10;
+  let config;
+  if (tipo === 'venduti') {
+    config = buildBarConfig(label + ' — Venduti', filterGroupBy([cat],'prodotto','qty',N),'qty','pezzi','blue');
+  } else if (tipo === 'incasso') {
+    config = buildBarConfig(label + ' — Incasso', filterGroupBy([cat],'prodotto','totale',N),'totale','€','gold');
+  } else {
+    config = buildMarginConfig(label + ' — Margine', filterGroupByMargine([cat],'prodotto',N));
+  }
+  const overlay = document.getElementById('modal-overlay');
+  document.getElementById('modal-title').textContent = config.title;
+  document.getElementById('modal-body').innerHTML = config.html;
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  if (config.chartData) {
+    setTimeout(() => renderChart(config.chartData, config.chartType, config.colorScheme, config.unit), 50);
+  }
 }
 
 // ===== BUILD UI =====
@@ -1852,6 +1913,7 @@ function buildUI() {
   animateValue(el, margEff);
   if(bep>0){const p=Math.min(100,(totImponibile/bep)*100);document.getElementById('s-progress').style.width=p+'%';document.getElementById('s-progress').style.background=p>=100?'var(--green)':'var(--accent)';}
   buildTop5Bars();
+  buildDashboardButtons();
 }
 
 function buildTop5Bars() {
@@ -2102,9 +2164,9 @@ window.salvaLocale = async function() {
     const { doc, setDoc, updateDoc, collection, getDocs } = window._firestore;
 
     if (localeEditId) {
-      await updateDoc(doc(db, 'users', adminUid, 'locali_config', localeEditId), {
+      await setDoc(doc(db, 'users', adminUid, 'locali_config', localeEditId), {
         nome, icona: localeIconaSelezionata
-      });
+      }, { merge: true });
       const l = getLocaliAttivi().find(x => x.id === localeEditId);
       if (l) { l.nome = nome; l.icona = localeIconaSelezionata; }
     } else {
