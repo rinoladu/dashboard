@@ -789,7 +789,7 @@ body.light .emoji-btn { background: #e8eaed; }
     <div class="card"><div class="card-label">Coperti</div><div class="card-value accent" id="s-coperti">—</div></div>
     <div class="card"><div class="card-label">Incasso lordo (IVA incl.)</div><div class="card-value accent" id="s-lordo">—</div></div>
     <div class="card"><div class="card-label">Incasso imponibile</div><div class="card-value accent" id="s-incasso">—</div></div>
-    <div class="card"><div class="card-label">Incasso per coperto</div><div class="card-value accent" id="s-inc-coperto">—</div></div>
+    <div class="card"><div class="card-label">Servizi</div><div class="card-value accent" id="s-servizi">—</div></div>
     <div class="card"><div class="card-label">Margine chiusura</div><div class="card-value green" id="s-margine">—</div></div>
     <div class="card"><div class="card-label">Margine %</div><div class="card-value green" id="s-margine-perc">—</div></div>
     <div class="card"><div class="card-label">Break Even</div><div class="card-value blue" id="s-bep">—</div></div>
@@ -1928,9 +1928,15 @@ function buildUI() {
     return (cat.includes('CLIENTE')||cat.includes('COPERTI')) && prod.includes('COPERTO');
   });
   const coperti=copertiRows.length>0 ? Math.round(copertiRows.reduce((s,r)=>s+r.qty,0)) : null;
-  const incPerCoperto=coperti&&coperti>0?totLordo/coperti:null;
+  // Servizi: somma righe con SERVIZIO nella categoria coperti/cliente
+  const serviziRows=d.chiusura.filter(r=>{
+    const cat=(r.cat||'').toUpperCase();
+    const prod=(r.prodotto||'').toUpperCase();
+    return (cat.includes('CLIENTE')||cat.includes('COPERTI')) && prod.includes('SERVIZIO');
+  });
+  const servizi=serviziRows.length>0 ? Math.round(serviziRows.reduce((s,r)=>s+r.qty,0)) : null;
   document.getElementById('s-coperti').textContent=coperti!==null?coperti+' pax':'N/D';
-  document.getElementById('s-inc-coperto').textContent=incPerCoperto!==null?fmt(incPerCoperto):'N/D';
+  document.getElementById('s-servizi').textContent=servizi!==null?servizi+' serv.':'N/D';
   animateValue(document.getElementById('s-lordo'), totLordo);
   animateValue(document.getElementById('s-incasso'), totImponibile);
   animateValue(document.getElementById('s-margine'), totMargine);
