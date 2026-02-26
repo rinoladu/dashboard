@@ -1932,7 +1932,7 @@ function buildUI() {
   const serviziRows=d.chiusura.filter(r=>{
     const cat=(r.cat||'').toUpperCase();
     const prod=(r.prodotto||'').toUpperCase();
-    return (cat.includes('CLIENTE')||cat.includes('COPERTI')) && prod.includes('SERVIZIO');
+    return (cat.includes('SERVIZIO')||cat.includes('SERVIZIO')) && prod.includes('SERVIZIO');
   });
   const servizi=serviziRows.length>0 ? Math.round(serviziRows.reduce((s,r)=>s+r.qty,0)) : null;
   document.getElementById('s-coperti').textContent=coperti!==null?coperti+' pax':'N/D';
