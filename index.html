@@ -1744,10 +1744,29 @@ function parseWorkbook(wb, filename, periodo, mese=null) {
   if (wb.Sheets['CHIUSURA']) {
     const rows = XLSX.utils.sheet_to_json(wb.Sheets['CHIUSURA'],{header:1});
     const h = rows[0];
-    const idx = { prodotto:h.indexOf('PRODOTTO'), cod:h.indexOf('COD. PROD.'), cat:h.indexOf('CATEGORIA'), qty:h.indexOf("QUANTITA'"), totale:h.indexOf('TOTALE') };
+    const idx = {
+      prodotto: h.indexOf('PRODOTTO'),
+      cod:      h.indexOf('COD. PROD.'),
+      cat:      h.indexOf('CATEGORIA'),
+      qty:      h.indexOf("QUANTITA'"),
+      totale:   h.indexOf('TOTALE'),
+      totImp:   h.indexOf('TOT. IMP.'),      // colonna imponibile diretta (Kings)
+      margine:  h.indexOf('MARGINE'),         // margine già calcolato (Kings)
+      costoTot: h.indexOf('COSTO TOTALE'),    // costo totale già calcolato (Kings)
+    };
     for (let i=1;i<rows.length;i++) {
       const r=rows[i]; if(!r[idx.prodotto]) continue;
-      result.chiusura.push({ prodotto:String(r[idx.prodotto]||'').trim(), cod:r[idx.cod], cat:String(r[idx.cat]||'').trim(), qty:parseFloat(r[idx.qty])||0, totale:parseFloat(r[idx.totale])||0 });
+      result.chiusura.push({
+        prodotto: String(r[idx.prodotto]||'').trim(),
+        cod:      r[idx.cod],
+        cat:      String(r[idx.cat]||'').trim(),
+        qty:      parseFloat(r[idx.qty])||0,
+        totale:   parseFloat(r[idx.totale])||0,
+        // Se il file ha già imponibile e margine pre-calcolati, li salviamo
+        _totImp:   idx.totImp>=0  ? (parseFloat(r[idx.totImp])||0)   : null,
+        _margine:  idx.margine>=0 ? (parseFloat(r[idx.margine])||0)  : null,
+        _costoTot: idx.costoTot>=0? (parseFloat(r[idx.costoTot])||0) : null,
+      });
     }
   }
   if (wb.Sheets['FOOD-DRINK COST']) {
@@ -1807,12 +1826,22 @@ function parseWorkbook(wb, filename, periodo, mese=null) {
   }
   result.chiusura.forEach(item => {
     const k=String(Math.round(parseFloat(item.cod)));
-    item.imponibile=item.totale/1.10;
-    const fd=result.foodDrinkCost[k];
-    item.costoUnit=fd?fd.costoUnit:0;
-    item.costoTot=item.costoUnit*item.qty;
-    item.margineEuro=item.costoTot===0?item.imponibile:item.imponibile-item.costoTot;
+    // Se il file ha già TOT. IMP. pre-calcolato, usarlo; altrimenti calcola da totale
+    item.imponibile = item._totImp !== null ? item._totImp : item.totale/1.10;
+    // Se il file ha già MARGINE pre-calcolato, usarlo direttamente
+    if (item._margine !== null) {
+      item.costoTot  = item._costoTot !== null ? item._costoTot : 0;
+      item.costoUnit = item.qty > 0 ? item.costoTot / item.qty : 0;
+      item.margineEuro = item._margine;
+    } else {
+      const fd=result.foodDrinkCost[k];
+      item.costoUnit=fd?fd.costoUnit:0;
+      item.costoTot=item.costoUnit*item.qty;
+      item.margineEuro=item.costoTot===0?item.imponibile:item.imponibile-item.costoTot;
+    }
     item.marginePerc=item.imponibile>0?(item.margineEuro/item.imponibile)*100:0;
+    // Pulisci campi temporanei
+    delete item._totImp; delete item._margine; delete item._costoTot;
   });
   result.totImponibile=result.chiusura.reduce((s,r)=>s+r.imponibile,0);
   result.totLordo=result.totImponibile*1.10;
@@ -1893,8 +1922,13 @@ function buildUI() {
   const bep=percMargine>0?totImponibile+(costiGiorno-totMargine)/percMargine:0;
   const margEff=totMargine-costiGiorno;
   // Coperti
-  const copertiRow=d.chiusura.find(r=>r.cat==='--CLIENTE--'&&r.prodotto&&r.prodotto.toUpperCase().includes('COPERTO'));
-  const coperti=copertiRow?Math.round(copertiRow.qty):null;
+  // Somma tutti i prodotti "COPERTO" nelle categorie --CLIENTE-- e --COPERTI--
+  const copertiRows=d.chiusura.filter(r=>{
+    const cat=(r.cat||'').toUpperCase();
+    const prod=(r.prodotto||'').toUpperCase();
+    return (cat.includes('CLIENTE')||cat.includes('COPERTI')) && prod.includes('COPERTO');
+  });
+  const coperti=copertiRows.length>0 ? Math.round(copertiRows.reduce((s,r)=>s+r.qty,0)) : null;
   const incPerCoperto=coperti&&coperti>0?totLordo/coperti:null;
   document.getElementById('s-coperti').textContent=coperti!==null?coperti+' pax':'N/D';
   document.getElementById('s-inc-coperto').textContent=incPerCoperto!==null?fmt(incPerCoperto):'N/D';
