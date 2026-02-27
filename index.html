@@ -675,10 +675,22 @@ body.light .emoji-btn { background: #e8eaed; }
     </div>
     <div class="add-day-zone" onclick="document.getElementById('file-input').click()">
       <span style="font-size:2rem;display:block;margin-bottom:0.5rem">📊</span>
-      <h3>Aggiungi chiusura</h3>
-      <p>Tocca per caricare un file Excel</p>
+      <h3>Aggiungi chiusure</h3>
+      <p>Tocca per caricare uno o più file Excel</p>
     </div>
-    <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none">
+    <input type="file" id="file-input" accept=".xlsx,.xls" multiple style="display:none">
+    <!-- PROGRESS UPLOAD MULTIPLO -->
+    <div id="upload-progress" style="display:none;margin:0 1rem 0.5rem;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:0.75rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3)">Caricamento in corso</span>
+        <span id="upload-count" style="font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;color:var(--accent);font-weight:700">0/0</span>
+      </div>
+      <div style="background:var(--surface2);border-radius:99px;height:6px;overflow:hidden">
+        <div id="upload-bar" style="height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;transition:width 0.3s;width:0%"></div>
+      </div>
+      <div id="upload-current" style="font-size:0.75rem;color:var(--text3);margin-top:0.5rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
+      <div id="upload-errors" style="font-size:0.72rem;color:var(--red);margin-top:0.4rem"></div>
+    </div>
     <!-- WIDGET OBIETTIVO MENSILE -->
     <div class="obiettivo-widget" id="obiettivo-widget" style="display:none">
       <div class="obiettivo-header">
@@ -1285,10 +1297,10 @@ window.addEventListener('load', () => {
     renderGiorniList();
   });
   document.getElementById('file-input').addEventListener('change', e => {
-    if (e.target.files[0]) {
+    if (e.target.files.length > 0) {
       const periodo = document.getElementById('periodo-select').value;
       const mese = periodo === 'mensile' ? document.getElementById('mese-select').value : null;
-      processFile(e.target.files[0], periodo, mese);
+      processFileMultipli(Array.from(e.target.files), periodo, mese);
     }
     e.target.value = '';
   });
@@ -1297,13 +1309,69 @@ window.addEventListener('load', () => {
   dz.addEventListener('dragleave', () => dz.style.borderColor = '');
   dz.addEventListener('drop', e => {
     e.preventDefault(); dz.style.borderColor = '';
-    if (e.dataTransfer.files[0]) {
+    const files = Array.from(e.dataTransfer.files).filter(f => f.name.match(/\.xlsx?$/i));
+    if (files.length > 0) {
       const periodo = document.getElementById('periodo-select').value;
       const mese = periodo === 'mensile' ? document.getElementById('mese-select').value : null;
-      processFile(e.dataTransfer.files[0], periodo, mese);
+      processFileMultipli(files, periodo, mese);
     }
   });
 });
+
+// ===== UPLOAD MULTIPLO =====
+async function processFileMultipli(files, periodo, mese) {
+  if (files.length === 1) {
+    // Singolo file: comportamento normale senza progress
+    processFile(files[0], periodo, mese);
+    return;
+  }
+
+  const progressEl = document.getElementById('upload-progress');
+  const barEl = document.getElementById('upload-bar');
+  const countEl = document.getElementById('upload-count');
+  const currentEl = document.getElementById('upload-current');
+  const errorsEl = document.getElementById('upload-errors');
+
+  progressEl.style.display = 'block';
+  errorsEl.textContent = '';
+  const errors = [];
+  const total = files.length;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    countEl.textContent = `${i + 1}/${total}`;
+    currentEl.textContent = file.name;
+    barEl.style.width = ((i / total) * 100) + '%';
+
+    try {
+      await new Promise((resolve, reject) => {
+        // Monkey-patch temporaneo: cattura errori da processFile
+        const origAlert = window.alert;
+        window.alert = (msg) => { reject(new Error(msg)); window.alert = origAlert; };
+        try {
+          processFile(file, periodo, mese);
+          // processFile è async via FileReader — aspetta un tick
+          setTimeout(() => { window.alert = origAlert; resolve(); }, 300);
+        } catch(e) {
+          window.alert = origAlert;
+          reject(e);
+        }
+      });
+    } catch(e) {
+      errors.push(`${file.name}: ${e.message}`);
+    }
+
+    // Piccola pausa tra file per non sovraccaricare
+    await new Promise(r => setTimeout(r, 150));
+  }
+
+  barEl.style.width = '100%';
+  countEl.textContent = `${total}/${total}`;
+  currentEl.textContent = errors.length === 0 ? '✅ Tutti i file caricati!' : `⚠️ ${total - errors.length}/${total} caricati`;
+  if (errors.length > 0) errorsEl.innerHTML = errors.map(e => `• ${e}`).join('<br>');
+
+  setTimeout(() => { progressEl.style.display = 'none'; }, 3000);
+}
 
 // ===== EXPORT / IMPORT (manteniamo per backup locale) =====
 function exportData() {
@@ -1932,7 +2000,7 @@ function buildUI() {
   const serviziRows=d.chiusura.filter(r=>{
     const cat=(r.cat||'').toUpperCase();
     const prod=(r.prodotto||'').toUpperCase();
-    return (cat.includes('SERVIZIO')||cat.includes('SERVIZIO')) && prod.includes('SERVIZIO');
+    return (cat.includes('CLIENTE')||cat.includes('COPERTI')) && prod.includes('SERVIZIO');
   });
   const servizi=serviziRows.length>0 ? Math.round(serviziRows.reduce((s,r)=>s+r.qty,0)) : null;
   document.getElementById('s-coperti').textContent=coperti!==null?coperti+' pax':'N/D';
