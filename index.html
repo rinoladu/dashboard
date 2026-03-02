@@ -353,6 +353,13 @@ body {
 .obiettivo-track { margin-top: 0.9rem; background: rgba(255,255,255,0.06); border-radius: 100px; height: 4px; overflow: hidden; position: relative; }
 .obiettivo-track-fill { height: 100%; border-radius: 100px; background: linear-gradient(90deg, var(--accent), #f5d98a); transition: width 1.5s cubic-bezier(0.34, 1.1, 0.64, 1); }
 .obiettivo-status { margin-top: 0.5rem; font-size: 0.65rem; color: var(--text3); font-family: 'Barlow Condensed', sans-serif; letter-spacing: 0.06em; display: flex; justify-content: space-between; }
+.btn-obiettivo-nav {
+  background: none; border: 1px solid var(--border); color: var(--text2);
+  border-radius: 6px; width: 24px; height: 24px; font-size: 1rem; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; padding: 0; font-family: inherit;
+}
+.btn-obiettivo-nav:hover { border-color: var(--accent); color: var(--accent); }
 .btn-obiettivo-edit {
   background: none; border: 1px solid var(--border); color: var(--text3);
   border-radius: 6px; padding: 0.25rem 0.6rem; font-size: 0.65rem;
@@ -695,9 +702,11 @@ body.light .emoji-btn { background: #e8eaed; }
     <div class="obiettivo-widget" id="obiettivo-widget" style="display:none">
       <div class="obiettivo-header">
         <div class="obiettivo-label">Obiettivo mensile</div>
-        <div style="display:flex;align-items:center;gap:0.6rem">
-          <div class="obiettivo-mese" id="obiettivo-mese-label"></div>
-          <button class="btn-obiettivo-edit" onclick="apriImpostazioniObiettivo()">⚙ imposta</button>
+        <div style="display:flex;align-items:center;gap:0.5rem">
+          <button class="btn-obiettivo-nav" onclick="cambiaObietttivoMese(-1)">‹</button>
+          <div class="obiettivo-mese" id="obiettivo-mese-label" style="min-width:90px;text-align:center"></div>
+          <button class="btn-obiettivo-nav" onclick="cambiaObietttivoMese(1)">›</button>
+          <button class="btn-obiettivo-edit" onclick="apriImpostazioniObiettivo()">⚙</button>
         </div>
       </div>
       <div class="obiettivo-body">
@@ -714,7 +723,7 @@ body.light .emoji-btn { background: #e8eaed; }
         </div>
         <div class="obiettivo-info">
           <div class="obiettivo-row">
-            <div class="obiettivo-row-label">Incassato questo mese</div>
+            <div class="obiettivo-row-label" id="obiettivo-row-label-inc">Incassato</div>
             <div class="obiettivo-row-value acc" id="obiettivo-incassato">—</div>
           </div>
           <div class="obiettivo-row">
@@ -2341,17 +2350,30 @@ function getObiettivoSalvato() {
   try { return parseFloat(localStorage.getItem(getObiettivoKey())) || 0; } catch(e) { return 0; }
 }
 
+// Mese/anno selezionato nel widget obiettivo (default: mese corrente)
+let obiettivoMeseSelezionato = new Date().getMonth();
+let obiettivoAnnoSelezionato = new Date().getFullYear();
+
+function cambiaObietttivoMese(delta) {
+  obiettivoMeseSelezionato += delta;
+  if (obiettivoMeseSelezionato > 11) { obiettivoMeseSelezionato = 0; obiettivoAnnoSelezionato++; }
+  if (obiettivoMeseSelezionato < 0)  { obiettivoMeseSelezionato = 11; obiettivoAnnoSelezionato--; }
+  aggiornaWidgetObiettivo();
+}
+window.cambiaObietttivoMese = cambiaObietttivoMese;
+
 function aggiornaWidgetObiettivo() {
   const widget = document.getElementById('obiettivo-widget');
   if (!widget) return;
 
   const obiettivo = getObiettivoSalvato();
 
-  // Calcola incasso del mese corrente (solo giornaliere)
   const ora = new Date();
-  const annoCorrente = ora.getFullYear();
-  const meseCorrente = ora.getMonth();
   const nomeMesi = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  const annoCorrente = obiettivoAnnoSelezionato;
+  const meseCorrente = obiettivoMeseSelezionato;
+  // Indica se stiamo guardando il mese corrente reale
+  const isOggi = annoCorrente === ora.getFullYear() && meseCorrente === ora.getMonth();
 
   const chiusureMese = CHIUSURE.filter(c => {
     if ((c.tipo || 'giorno') !== 'giorno') return false;
@@ -2436,10 +2458,12 @@ function aggiornaWidgetObiettivo() {
 
   // Status text
   const giorniNelMese = new Date(annoCorrente, meseCorrente + 1, 0).getDate();
-  const giornoOggi = ora.getDate();
+  const giornoOggi = isOggi ? ora.getDate() : giorniNelMese;
   const giorniRimasti = giorniNelMese - giornoOggi;
-  document.getElementById('obiettivo-status-left').textContent = chiusureMese.length + ' chiusure questo mese';
-  document.getElementById('obiettivo-status-right').textContent = giorniRimasti + ' gg al termine del mese';
+  document.getElementById('obiettivo-status-left').textContent = chiusureMese.length + ' chiusure';
+  document.getElementById('obiettivo-status-right').textContent = isOggi
+    ? giorniRimasti + ' gg al termine'
+    : (chiusureMese.length > 0 ? 'mese concluso' : 'nessun dato');
 }
 
 function apriImpostazioniObiettivo() {
