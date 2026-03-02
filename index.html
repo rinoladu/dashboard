@@ -114,9 +114,6 @@ body.light .home-header { background: rgba(240,242,245,0.95); }
 body.light .tabs { background: rgba(240,242,245,0.95); }
 body.light .dash-header { background: rgba(240,242,245,0.95); }
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script> 
-
 .btn-theme { font-size: 1rem; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -1570,30 +1567,6 @@ function renderGiorniList() {
       </div>
     </div>`;
   }).join('');
-  // ... (dentro aggiornaWidgetObiettivo, dopo il calcolo di delta ed isOggi)
-
-  // Calcolo Proiezione (Trend)
-  let trendHtml = '';
-  if (isOggi && target > 0 && chiusureMese.length > 0) {
-    const giornoCorrente = ora.getDate();
-    const giorniTotali = giorniNelMese;
-    const proiezione = (incassatoMese / giornoCorrente) * giorniTotali;
-    const coloreTrend = proiezione >= target ? 'var(--green)' : 'var(--red)';
-    trendHtml = `<span style="color:${coloreTrend}">Trend: ${fmt(proiezione)}</span>`;
-  }
-
-  // Status text aggiornato
-  document.getElementById('obiettivo-status-left').textContent = chiusureMese.length + ' chiusure';
-  const statusRight = document.getElementById('obiettivo-status-right');
-  
-  if (isOggi && target > 0) {
-      statusRight.innerHTML = trendHtml;
-  } else {
-      statusRight.textContent = isOggi 
-        ? giorniRimasti + ' gg al termine' 
-        : (chiusureMese.length > 0 ? 'mese concluso' : 'nessun dato');
-  }
-}
 }
 
 function renderGiorniListAnalisi() {
@@ -2024,15 +1997,6 @@ function buildUI() {
   const percMargine=totImponibile>0?totMargine/totImponibile:0;
   const bep=percMargine>0?totImponibile+(costiGiorno-totMargine)/percMargine:0;
   const margEff=totMargine-costiGiorno;
-  // ... (dentro buildUI)
-  const deltaHtml = (CURRENT_TIPO === 'giorno') ? calcolaDeltaSettimanale(d.data, totLordo) : '';
-  
-  // Modifica la riga dell'animazione del lordo:
-  animateValue(document.getElementById('s-lordo'), totLordo);
-  // Dopo l'animazione (o appena sotto), aggiungi il badge:
-  setTimeout(() => {
-    document.getElementById('s-lordo').innerHTML += deltaHtml;
-  }, 1000);
   // Coperti
   // Somma tutti i prodotti "COPERTO" nelle categorie --CLIENTE-- e --COPERTI--
   const copertiRows=d.chiusura.filter(r=>{
@@ -2562,23 +2526,6 @@ function animateValue(el, endVal, isEuro=true, duration=900) {
 // ===== UTILS =====
 function fmt(n){if(n===null||n===undefined||isNaN(n))return'—';return new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR',maximumFractionDigits:2}).format(n);}
 function formatDate(d){if(!d)return'Data sconosciuta';try{const dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}catch{return d;}}
-function calcolaDeltaSettimanale(dataCorrente, valoreCorrente) {
-    const d = new Date(dataCorrente + 'T00:00:00');
-    d.setDate(d.getDate() - 7);
-    const dataSettimanaScorsa = d.toISOString().split('T')[0];
-    
-    const chiusuraPrecedente = CHIUSURE.find(c => c.data === dataSettimanaScorsa && (c.tipo || 'giorno') === 'giorno');
-    
-    if (chiusuraPrecedente) {
-        const valorePrec = (chiusuraPrecedente.totImponibile || 0) * 1.10;
-        if (valorePrec === 0) return null;
-        const diff = ((valoreCorrente - valorePrec) / valorePrec) * 100;
-        const icona = diff >= 0 ? '↑' : '↓';
-        const colore = diff >= 0 ? 'var(--green)' : 'var(--red)';
-        return `<span style="color:${colore}; font-size:0.75rem; font-weight:700; margin-left:8px;">${icona}${Math.abs(diff).toFixed(1)}%</span>`;
-    }
-    return '';
-}  
 </script>
 </body>
 </html>
