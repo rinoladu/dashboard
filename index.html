@@ -368,6 +368,84 @@ body {
 }
 .btn-obiettivo-edit:hover { border-color: var(--accent); color: var(--accent); }
 
+/* ===== PREVISIONI AI ===== */
+.previsioni-panel {
+  margin: 0 1rem 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 1.1rem 1.4rem;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+  position: relative; overflow: hidden;
+}
+.previsioni-panel::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(75,157,232,0.5), transparent);
+}
+.previsioni-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.8rem;
+}
+.previsioni-label {
+  font-family: 'Barlow Condensed', sans-serif; font-size: 0.65rem; font-weight: 700;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--text3);
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.ai-badge {
+  background: linear-gradient(135deg, rgba(75,157,232,0.2), rgba(160,75,232,0.2));
+  border: 1px solid rgba(75,157,232,0.3);
+  color: var(--accent2); font-size: 0.55rem; padding: 0.1rem 0.4rem;
+  border-radius: 4px; font-weight: 800; letter-spacing: 0.1em;
+}
+.btn-previsione {
+  background: none; border: 1px solid rgba(75,157,232,0.3); color: var(--accent2);
+  border-radius: 6px; padding: 0.25rem 0.6rem; font-size: 0.65rem;
+  font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 0.3rem;
+}
+.btn-previsione:hover { border-color: var(--accent2); background: rgba(75,157,232,0.08); }
+.btn-previsione:disabled { opacity: 0.4; cursor: not-allowed; }
+.previsioni-proiezione {
+  display: flex; align-items: center; gap: 1rem; margin-bottom: 0.8rem;
+}
+.prev-ring-wrap { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+.prev-ring-wrap svg { transform: rotate(-90deg); }
+.prev-ring-bg { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 5; }
+.prev-ring-fill { fill: none; stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 1.2s cubic-bezier(0.34,1.1,0.64,1); }
+.prev-ring-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.prev-ring-val { font-family: 'Barlow Condensed', sans-serif; font-size: 1rem; font-weight: 900; line-height: 1; color: var(--accent2); }
+.prev-ring-lbl { font-size: 0.55rem; color: var(--text3); }
+.prev-stats { flex: 1; display: flex; flex-direction: column; gap: 0.45rem; }
+.prev-stat-row { display: flex; flex-direction: column; gap: 0.05rem; }
+.prev-stat-label { font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); font-family: 'Barlow Condensed', sans-serif; }
+.prev-stat-value { font-family: 'Barlow Condensed', sans-serif; font-size: 1rem; font-weight: 700; color: var(--text); }
+.prev-stat-value.blue { color: var(--accent2); }
+.prev-stat-value.grn { color: var(--green); }
+.prev-stat-value.red { color: var(--red); }
+.prev-stat-value.acc { color: var(--accent); }
+.previsioni-alert {
+  border-radius: 10px; padding: 0.65rem 0.9rem; font-size: 0.75rem;
+  font-family: 'Barlow Condensed', sans-serif; letter-spacing: 0.03em; line-height: 1.4;
+  border: 1px solid; margin-top: 0.6rem;
+}
+.previsioni-alert.ok { background: rgba(61,214,140,0.08); border-color: rgba(61,214,140,0.25); color: var(--green); }
+.previsioni-alert.warn { background: rgba(232,184,75,0.08); border-color: rgba(232,184,75,0.25); color: var(--accent); }
+.previsioni-alert.danger { background: rgba(232,75,75,0.08); border-color: rgba(232,75,75,0.25); color: var(--red); }
+.previsioni-ai-testo {
+  font-size: 0.78rem; color: var(--text2); line-height: 1.5; margin-top: 0.8rem;
+  padding-top: 0.7rem; border-top: 1px solid var(--border);
+  font-family: 'Barlow', sans-serif;
+}
+.previsioni-loading {
+  display: flex; align-items: center; gap: 0.6rem; color: var(--text3);
+  font-size: 0.75rem; font-family: 'Barlow Condensed', sans-serif; letter-spacing: 0.06em;
+  padding: 0.5rem 0;
+}
+.dots { display: inline-flex; gap: 3px; }
+.dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--accent2); animation: dotPulse 1.2s infinite; }
+.dots span:nth-child(2) { animation-delay: 0.2s; }
+.dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotPulse { 0%,80%,100%{opacity:0.2;transform:scale(0.8)} 40%{opacity:1;transform:scale(1)} }
+body.light .previsioni-panel { background: #fff; }
+body.light .prev-ring-bg { stroke: rgba(0,0,0,0.06); }
+
 /* DASHBOARD */
 #dashboard-screen { display: none; }
 .dash-header {
@@ -742,6 +820,22 @@ body.light .emoji-btn { background: #e8eaed; }
       <div class="obiettivo-status">
         <span id="obiettivo-status-left"></span>
         <span id="obiettivo-status-right"></span>
+      </div>
+    </div>
+
+    <!-- PANNELLO PREVISIONI AI -->
+    <div class="previsioni-panel" id="previsioni-panel" style="display:none;margin-top:0.6rem">
+      <div class="previsioni-header">
+        <div class="previsioni-label">
+          🔮 Previsioni
+          <span class="ai-badge">AI</span>
+        </div>
+        <button class="btn-previsione" id="btn-genera-prev" onclick="generaPrevisioni()">✦ Genera</button>
+      </div>
+      <div id="previsioni-body">
+        <div style="font-size:0.75rem;color:var(--text3);font-family:'Barlow Condensed',sans-serif;letter-spacing:0.05em">
+          Premi "Genera" per ottenere una proiezione AI basata sui dati storici del mese corrente.
+        </div>
       </div>
     </div>
 
@@ -2362,6 +2456,212 @@ function cambiaObietttivoMese(delta) {
 }
 window.cambiaObietttivoMese = cambiaObietttivoMese;
 
+// ===== PREVISIONI AI =====
+let previsioniCache = {}; // cache per mese/anno
+
+function mostraPannoPrevisioni(show) {
+  const panel = document.getElementById('previsioni-panel');
+  if (panel) panel.style.display = show ? 'block' : 'none';
+}
+
+async function generaPrevisioni() {
+  const btn = document.getElementById('btn-genera-prev');
+  const body = document.getElementById('previsioni-body');
+  const ora = new Date();
+  const anno = ora.getFullYear();
+  const mese = ora.getMonth();
+
+  // Solo mese corrente
+  if (obiettivoMeseSelezionato !== mese || obiettivoAnnoSelezionato !== anno) {
+    body.innerHTML = '<div style="font-size:0.75rem;color:var(--text3);font-family:'Barlow Condensed',sans-serif">Le previsioni AI sono disponibili solo per il mese corrente.</div>';
+    return;
+  }
+
+  const cacheKey = `${anno}-${mese}`;
+  if (previsioniCache[cacheKey]) {
+    renderPrevisioni(previsioniCache[cacheKey]);
+    return;
+  }
+
+  // Raccogli dati mese corrente
+  const chiusureMese = CHIUSURE.filter(c => {
+    if ((c.tipo || 'giorno') !== 'giorno') return false;
+    const d = new Date(c.data + 'T00:00:00');
+    return d.getFullYear() === anno && d.getMonth() === mese;
+  }).sort((a,b) => a.data.localeCompare(b.data));
+
+  if (chiusureMese.length < 3) {
+    body.innerHTML = '<div style="font-size:0.75rem;color:var(--text3);font-family:'Barlow Condensed',sans-serif">Servono almeno 3 chiusure nel mese per generare previsioni.</div>';
+    return;
+  }
+
+  // Raccogli dati mese precedente (confronto storico)
+  const mesePrecMese = mese === 0 ? 11 : mese - 1;
+  const mesePrecAnno = mese === 0 ? anno - 1 : anno;
+  const chiusurePrec = CHIUSURE.filter(c => {
+    if ((c.tipo || 'giorno') !== 'giorno') return false;
+    const d = new Date(c.data + 'T00:00:00');
+    return d.getFullYear() === mesePrecAnno && d.getMonth() === mesePrecMese;
+  });
+
+  const nomeMesi = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  const giorniNelMese = new Date(anno, mese + 1, 0).getDate();
+  const giornoOggi = ora.getDate();
+  const giorniRimasti = giorniNelMese - giornoOggi;
+  const totaleFinora = chiusureMese.reduce((s,c) => s + (c.totLordo||(c.totImponibile||0)*1.10), 0);
+  const mediaGiornaliera = totaleFinora / chiusureMese.length;
+  const totPrecMese = chiusurePrec.reduce((s,c) => s + (c.totLordo||(c.totImponibile||0)*1.10), 0);
+  const obiettivo = getObiettivoSalvato();
+
+  // Calcola proiezione locale (senza AI) per mostrare subito
+  const proiezioneLineare = totaleFinora + (mediaGiornaliera * (giorniRimasti * chiusureMese.length / giornoOggi));
+
+  // Mostra loading + risultati parziali subito
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  body.innerHTML = `
+    <div class="previsioni-proiezione">
+      <div class="prev-ring-wrap">
+        <svg width="64" height="64" viewBox="0 0 64 64">
+          <circle class="prev-ring-bg" cx="32" cy="32" r="26"/>
+          <circle class="prev-ring-fill" id="prev-ring" cx="32" cy="32" r="26"
+            stroke-dasharray="163.4" stroke-dashoffset="${obiettivo > 0 ? 163.4 - Math.min(1,(proiezioneLineare/obiettivo))*(163.4) : 80}"
+            style="stroke:var(--accent2)"/>
+        </svg>
+        <div class="prev-ring-text">
+          <div class="prev-ring-val">${obiettivo > 0 ? Math.round(Math.min(150,proiezioneLineare/obiettivo*100)) : '~'}${obiettivo > 0 ? '%' : ''}</div>
+          <div class="prev-ring-lbl">prev.</div>
+        </div>
+      </div>
+      <div class="prev-stats">
+        <div class="prev-stat-row">
+          <div class="prev-stat-label">Proiezione a fine mese</div>
+          <div class="prev-stat-value blue" id="prev-proiezione">${fmt(proiezioneLineare)}</div>
+        </div>
+        <div class="prev-stat-row">
+          <div class="prev-stat-label">Media giornaliera attuale</div>
+          <div class="prev-stat-value acc">${fmt(mediaGiornaliera)}</div>
+        </div>
+        <div class="prev-stat-row">
+          <div class="prev-stat-label">Giorni rimasti</div>
+          <div class="prev-stat-value">${giorniRimasti} gg (su ${giorniNelMese})</div>
+        </div>
+      </div>
+    </div>
+    ${renderAlertTrend(totaleFinora, proiezioneLineare, obiettivo, giornoOggi, giorniNelMese)}
+    <div class="previsioni-loading" id="ai-loading">
+      <div class="dots"><span></span><span></span><span></span></div>
+      Analisi AI in corso...
+    </div>
+  `;
+
+  // Chiama API Claude per analisi qualitativa
+  try {
+    const giorni7 = chiusureMese.slice(-7);
+    const trend7 = giorni7.reduce((s,c)=>s+(c.totLordo||(c.totImponibile||0)*1.10),0)/giorni7.length;
+    const trend3 = chiusureMese.slice(-3).reduce((s,c)=>s+(c.totLordo||(c.totImponibile||0)*1.10),0)/3;
+
+    const prompt = `Sei un analista finanziario per un ristorante italiano. Analizza questi dati e fornisci:
+1. Una valutazione del trend (2-3 righe max)
+2. Un alert chiaro: sei IN TREND, SOTTO TREND o IN DIFFICOLTÀ?
+3. 1 consiglio pratico specifico
+
+DATI MESE ${nomeMesi[mese]} ${anno}:
+- Chiusure registrate: ${chiusureMese.length} giorni su ${giornoOggi} aperti
+- Incassato finora (lordo IVA): €${Math.round(totaleFinora).toLocaleString('it-IT')}
+- Media giornaliera: €${Math.round(mediaGiornaliera).toLocaleString('it-IT')}
+- Trend ultimi 7gg: €${Math.round(trend7).toLocaleString('it-IT')}/giorno
+- Trend ultimi 3gg: €${Math.round(trend3).toLocaleString('it-IT')}/giorno
+- Proiezione fine mese: €${Math.round(proiezioneLineare).toLocaleString('it-IT')}
+${obiettivo > 0 ? `- Obiettivo mensile: €${Math.round(obiettivo).toLocaleString('it-IT')}` : '- Obiettivo mensile: non impostato'}
+${totPrecMese > 0 ? `- Mese precedente totale: €${Math.round(totPrecMese).toLocaleString('it-IT')}` : ''}
+
+Rispondi in italiano, tono diretto e professionale, max 4 righe totali. NON usare emoji né markdown.`;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await resp.json();
+    const testo = data.content?.[0]?.text || 'Analisi non disponibile.';
+
+    const result = { proiezioneLineare, mediaGiornaliera, giorniRimasti, giorniNelMese, totaleFinora, obiettivo, testo, giornoOggi };
+    previsioniCache[cacheKey] = result;
+    renderPrevisioni(result);
+  } catch(e) {
+    document.getElementById('ai-loading').innerHTML = '<span style="color:var(--text3);font-size:0.72rem">Analisi AI non disponibile — verifica connessione.</span>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '↺ Aggiorna';
+  }
+}
+
+function renderAlertTrend(totaleFinora, proiezione, obiettivo, giornoOggi, giorniNelMese) {
+  if (obiettivo <= 0) return '';
+  const attesoProporzionale = obiettivo * (giornoOggi / giorniNelMese);
+  const rapporto = totaleFinora / attesoProporzionale;
+  const diffPerc = ((proiezione - obiettivo) / obiettivo * 100).toFixed(1);
+
+  let classe, icona, testo;
+  if (rapporto >= 1.05) {
+    classe = 'ok'; icona = '↑';
+    testo = `In anticipo sul target. Proiezione +${Math.abs(diffPerc)}% sopra obiettivo (${fmt(proiezione - obiettivo)} surplus).`;
+  } else if (rapporto >= 0.9) {
+    classe = 'warn'; icona = '→';
+    testo = `In linea con il target. Proiezione ${diffPerc > 0 ? '+' : ''}${diffPerc}% rispetto all'obiettivo.`;
+  } else {
+    classe = 'danger'; icona = '↓';
+    testo = `Sotto trend. Proiezione ${fmt(proiezione - obiettivo)} sotto obiettivo. Serve +${fmt((obiettivo - totaleFinora) / Math.max(1, giorniNelMese - giornoOggi))}/giorno nei giorni rimasti.`;
+  }
+  return `<div class="previsioni-alert ${classe}">${icona} ${testo}</div>`;
+}
+
+function renderPrevisioni(r) {
+  const body = document.getElementById('previsioni-body');
+  if (!body) return;
+  const { proiezioneLineare, mediaGiornaliera, giorniRimasti, giorniNelMese, totaleFinora, obiettivo, testo, giornoOggi } = r;
+  const percAnello = obiettivo > 0 ? Math.min(163.4, (proiezioneLineare/obiettivo)*163.4) : 82;
+  const percVal = obiettivo > 0 ? Math.round(Math.min(150, proiezioneLineare/obiettivo*100)) : '~';
+
+  body.innerHTML = `
+    <div class="previsioni-proiezione">
+      <div class="prev-ring-wrap">
+        <svg width="64" height="64" viewBox="0 0 64 64">
+          <circle class="prev-ring-bg" cx="32" cy="32" r="26"/>
+          <circle class="prev-ring-fill" id="prev-ring" cx="32" cy="32" r="26"
+            stroke-dasharray="163.4" stroke-dashoffset="${163.4 - percAnello}"
+            style="stroke:${proiezioneLineare >= obiettivo && obiettivo > 0 ? 'var(--green)' : 'var(--accent2)'}"/>
+        </svg>
+        <div class="prev-ring-text">
+          <div class="prev-ring-val" style="color:${proiezioneLineare >= obiettivo && obiettivo > 0 ? 'var(--green)' : 'var(--accent2)'}">${percVal}${obiettivo > 0 ? '%' : ''}</div>
+          <div class="prev-ring-lbl">prev.</div>
+        </div>
+      </div>
+      <div class="prev-stats">
+        <div class="prev-stat-row">
+          <div class="prev-stat-label">Proiezione a fine mese</div>
+          <div class="prev-stat-value ${proiezioneLineare >= obiettivo && obiettivo > 0 ? 'grn' : 'blue'}">${fmt(proiezioneLineare)}</div>
+        </div>
+        <div class="prev-stat-row">
+          <div class="prev-stat-label">Media giornaliera attuale</div>
+          <div class="prev-stat-value acc">${fmt(mediaGiornaliera)}</div>
+        </div>
+        <div class="prev-stat-row">
+          <div class="prev-stat-label">Giorni rimasti</div>
+          <div class="prev-stat-value">${giorniRimasti} gg (su ${giorniNelMese})</div>
+        </div>
+      </div>
+    </div>
+    ${renderAlertTrend(totaleFinora, proiezioneLineare, obiettivo, giornoOggi, giorniNelMese)}
+    ${testo ? `<div class="previsioni-ai-testo">✦ ${testo}</div>` : ''}
+  `;
+}
+
 function aggiornaWidgetObiettivo() {
   const widget = document.getElementById('obiettivo-widget');
   if (!widget) return;
@@ -2397,10 +2697,16 @@ function aggiornaWidgetObiettivo() {
 
   if (target <= 0 && chiusureMese.length === 0) {
     widget.style.display = 'none';
+    mostraPannoPrevisioni(false);
     return;
   }
 
   widget.style.display = 'block';
+
+  // Mostra pannello previsioni solo per il mese corrente
+  mostraPannoPrevisioni(isOggi && chiusureMese.length >= 3);
+  // Resetta cache se cambio mese (così richiede nuovo AI al cambio)
+  if (!isOggi) previsioniCache = {};
 
   // Mese label
   document.getElementById('obiettivo-mese-label').textContent = nomeMesi[meseCorrente] + ' ' + annoCorrente;
