@@ -2473,7 +2473,7 @@ async function generaPrevisioni() {
 
   // Solo mese corrente
   if (obiettivoMeseSelezionato !== mese || obiettivoAnnoSelezionato !== anno) {
-    body.innerHTML = '<div style="font-size:0.75rem;color:var(--text3);font-family:'Barlow Condensed',sans-serif">Le previsioni AI sono disponibili solo per il mese corrente.</div>';
+    body.innerHTML = '<div style="font-size:0.75rem;color:var(--text3);font-family:\'Barlow Condensed\',sans-serif">Le previsioni AI sono disponibili solo per il mese corrente.</div>';
     return;
   }
 
@@ -2491,7 +2491,7 @@ async function generaPrevisioni() {
   }).sort((a,b) => a.data.localeCompare(b.data));
 
   if (chiusureMese.length < 3) {
-    body.innerHTML = '<div style="font-size:0.75rem;color:var(--text3);font-family:'Barlow Condensed',sans-serif">Servono almeno 3 chiusure nel mese per generare previsioni.</div>';
+    body.innerHTML = '<div style="font-size:0.75rem;color:var(--text3);font-family:\'Barlow Condensed\',sans-serif">Servono almeno 3 chiusure nel mese per generare previsioni.</div>';
     return;
   }
 
