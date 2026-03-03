@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>EGO Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32x32.png">
@@ -897,6 +898,7 @@ body.light .emoji-btn { background: #e8eaed; }
     </div>
     <div style="display:flex;gap:0.4rem">
       <button class="btn-sm" onclick="faiScreenshot()" id="btn-screenshot" title="Salva immagine">📸</button>
+      <button class="btn-sm" onclick="esportaPDF()" id="btn-pdf" title="Esporta PDF">📄 PDF</button>
       <button class="btn-sm" onclick="tornaHome()">← Home</button>
     </div>
   </div>
@@ -2248,6 +2250,313 @@ function renderChart(data,type,colorScheme,unit){
 }
 
 // ===== SCREENSHOT =====
+// ===== EXPORT PDF =====
+async function esportaPDF() {
+  const btn = document.getElementById('btn-pdf');
+  btn.textContent = '⏳';
+  btn.disabled = true;
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const d = CURRENT_DATA;
+    const title = document.getElementById('dash-title').textContent;
+    const subtitle = document.getElementById('dash-subtitle').textContent;
+    const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
+
+    // Calcola valori
+    const totImponibile = d.chiusura.reduce((s,r) => s + r.imponibile, 0);
+    const totLordo = totImponibile * 1.10;
+    const totMargine = d.chiusura.reduce((s,r) => s + r.margineEuro, 0);
+    const marginePerc = totImponibile > 0 ? (totMargine / totImponibile * 100) : 0;
+    const costiGiorno = d.costiGiorn || 0;
+    const margEff = totMargine - costiGiorno;
+    const percMargine = totImponibile > 0 ? totMargine / totImponibile : 0;
+    const bep = percMargine > 0 ? totImponibile + (costiGiorno - totMargine) / percMargine : 0;
+
+    // Coperti e servizi
+    const copertiRows = d.chiusura.filter(r => {
+      const cat=(r.cat||'').toUpperCase(), prod=(r.prodotto||'').toUpperCase();
+      return (cat.includes('CLIENTE')||cat.includes('COPERTI')) && prod.includes('COPERTO');
+    });
+    const coperti = copertiRows.length > 0 ? Math.round(copertiRows.reduce((s,r)=>s+r.qty,0)) : null;
+    const serviziRows = d.chiusura.filter(r => {
+      const cat=(r.cat||'').toUpperCase(), prod=(r.prodotto||'').toUpperCase();
+      return cat.includes('SERVIZIO') || prod.includes('SERVIZIO');
+    });
+    const servizi = serviziRows.length > 0 ? Math.round(serviziRows.reduce((s,r)=>s+r.qty,0)) : null;
+
+    // Top categorie
+    const bycat = {};
+    d.chiusura.filter(r => !['SERVIZIO','--CLIENTE--'].includes(r.cat)).forEach(r => {
+      if (!bycat[r.cat]) bycat[r.cat] = { qty:0, incasso:0, margine:0 };
+      bycat[r.cat].qty += r.qty || 0;
+      bycat[r.cat].incasso += r.imponibile || 0;
+      bycat[r.cat].margine += r.margineEuro || 0;
+    });
+    const topCat = Object.entries(bycat).sort((a,b) => b[1].incasso - a[1].incasso).slice(0, 10);
+
+    // Top prodotti per incasso
+    const byprod = {};
+    d.chiusura.filter(r => !['SERVIZIO','--CLIENTE--'].includes(r.cat)).forEach(r => {
+      const k = r.prodotto || 'N/D';
+      if (!byprod[k]) byprod[k] = { qty:0, incasso:0, margine:0, cat: r.cat };
+      byprod[k].qty += r.qty || 0;
+      byprod[k].incasso += r.imponibile || 0;
+      byprod[k].margine += r.margineEuro || 0;
+    });
+    const topProd = Object.entries(byprod).sort((a,b) => b[1].incasso - a[1].incasso).slice(0, 15);
+
+    // Crea PDF A4
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const W = 210, M = 14; // larghezza pagina, margine
+    let y = 0;
+
+    // ── Funzioni helper ──────────────────────────────────────────────
+    const euro = n => n == null || isNaN(n) ? '—' : new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n);
+    const perc = n => isNaN(n) ? '—' : n.toFixed(1) + '%';
+
+    function addPage() { doc.addPage(); y = 20; }
+
+    function checkPage(needed = 10) { if (y + needed > 280) addPage(); }
+
+    function headerPagina() {
+      // Striscia header sottile
+      doc.setFillColor(14, 16, 22);
+      doc.rect(0, 0, W, 12, 'F');
+      doc.setFontSize(7); doc.setTextColor(155,161,173);
+      doc.setFont('helvetica','normal');
+      doc.text('EGO DASHBOARD — REPORT RISERVATO', M, 8);
+      doc.text(`Generato il ${oggi}`, W - M, 8, { align:'right' });
+    }
+
+    function sectionTitle(txt, yPos) {
+      doc.setFillColor(30, 34, 48);
+      doc.rect(M, yPos - 4, W - M*2, 7, 'F');
+      doc.setFontSize(7.5); doc.setTextColor(155,161,173);
+      doc.setFont('helvetica','bold');
+      doc.text(txt.toUpperCase(), M + 3, yPos);
+      return yPos + 7;
+    }
+
+    function kpiCard(label, value, x, yPos, w, color) {
+      doc.setFillColor(20, 23, 32);
+      doc.roundedRect(x, yPos, w, 14, 1.5, 1.5, 'F');
+      doc.setFontSize(6); doc.setTextColor(107, 114, 128); doc.setFont('helvetica','normal');
+      doc.text(label.toUpperCase(), x + 3, yPos + 4.5);
+      doc.setFontSize(10); doc.setFont('helvetica','bold');
+      if (color === 'gold')     doc.setTextColor(232, 184, 75);
+      else if (color === 'grn') doc.setTextColor(61, 214, 140);
+      else if (color === 'red') doc.setTextColor(232, 75, 75);
+      else if (color === 'blu') doc.setTextColor(75, 157, 232);
+      else                      doc.setTextColor(240, 242, 245);
+      doc.text(value, x + 3, yPos + 11);
+    }
+
+    function tableRow(cols, widths, yPos, isHeader, isAlt) {
+      const rowH = 6.5;
+      if (isHeader) {
+        doc.setFillColor(30, 34, 48);
+        doc.rect(M, yPos, W - M*2, rowH, 'F');
+      } else if (isAlt) {
+        doc.setFillColor(18, 21, 30);
+        doc.rect(M, yPos, W - M*2, rowH, 'F');
+      }
+      let x = M + 2;
+      cols.forEach((col, i) => {
+        if (isHeader) {
+          doc.setFontSize(6.5); doc.setTextColor(107,114,128); doc.setFont('helvetica','bold');
+        } else {
+          doc.setFontSize(7.5); doc.setTextColor(220,224,230); doc.setFont('helvetica','normal');
+        }
+        const align = (typeof col === 'object' && col.align) ? col.align : 'left';
+        const txt = (typeof col === 'object') ? col.text : col;
+        const xPos = align === 'right' ? x + widths[i] - 3 : x;
+        doc.text(String(txt), xPos, yPos + 4.5, { align });
+        if (typeof col === 'object' && col.color) {
+          if (col.color === 'grn') doc.setTextColor(61,214,140);
+          else if (col.color === 'red') doc.setTextColor(232,75,75);
+          else if (col.color === 'gold') doc.setTextColor(232,184,75);
+          else if (col.color === 'blu') doc.setTextColor(75,157,232);
+          doc.text(String(txt), xPos, yPos + 4.5, { align });
+        }
+        x += widths[i];
+      });
+      // Linea separatrice sottile
+      doc.setDrawColor(30, 34, 48); doc.setLineWidth(0.1);
+      doc.line(M, yPos + rowH, W - M, yPos + rowH);
+      return yPos + rowH;
+    }
+
+    // ════════════════════════════════════════════════════════
+    // PAGINA 1 — COPERTINA + KPI
+    // ════════════════════════════════════════════════════════
+    // Sfondo scuro
+    doc.setFillColor(7, 9, 12);
+    doc.rect(0, 0, W, 297, 'F');
+
+    headerPagina();
+    y = 22;
+
+    // Logo / Titolo principale
+    doc.setFontSize(28); doc.setFont('helvetica','bold');
+    doc.setTextColor(232, 184, 75);
+    doc.text(title, M, y);
+    y += 7;
+
+    doc.setFontSize(9); doc.setFont('helvetica','normal');
+    doc.setTextColor(107, 114, 128);
+    doc.text(subtitle + '  •  ' + oggi, M, y);
+    y += 2;
+
+    // Linea dorata
+    doc.setDrawColor(232, 184, 75); doc.setLineWidth(0.4);
+    doc.line(M, y, W - M, y);
+    y += 8;
+
+    // ── KPI principali (2 righe x 3 colonne) ──────────────────
+    y = sectionTitle('Riepilogo economico', y);
+    y += 2;
+
+    const cardW = (W - M*2 - 6) / 3;
+    const kpis = [
+      { label: 'Incasso lordo (IVA incl.)', value: euro(totLordo), color:'gold' },
+      { label: 'Incasso imponibile', value: euro(totImponibile), color:'gold' },
+      { label: coperti ? 'Coperti' : 'Servizi', value: coperti ? coperti+' pax' : (servizi ? servizi+' serv.' : 'N/D'), color:'gold' },
+      { label: 'Margine chiusura', value: euro(totMargine), color:'grn' },
+      { label: 'Margine %', value: perc(marginePerc), color:'grn' },
+      { label: 'Margine effettivo', value: euro(margEff), color: margEff >= 0 ? 'grn' : 'red' },
+    ];
+
+    for (let i = 0; i < kpis.length; i += 3) {
+      for (let j = 0; j < 3; j++) {
+        if (kpis[i+j]) kpiCard(kpis[i+j].label, kpis[i+j].value, M + j*(cardW+3), y, cardW, kpis[i+j].color);
+      }
+      y += 17;
+    }
+
+    // ── KPI secondari (break even e costi) ──────────────────────
+    if (costiGiorno > 0) {
+      const kpis2 = [
+        { label: 'Break Even', value: euro(bep), color:'blu' },
+        { label: 'Costi fissi', value: euro(costiGiorno), color:'' },
+        { label: servizi ? 'Servizi' : (coperti ? 'Coperti' : ''), value: servizi ? servizi+' serv.' : (coperti ? coperti+' pax' : ''), color:'gold' },
+      ];
+      for (let j = 0; j < 3; j++) {
+        if (kpis2[j] && kpis2[j].label) kpiCard(kpis2[j].label, kpis2[j].value, M + j*(cardW+3), y, cardW, kpis2[j].color);
+      }
+      y += 17;
+    }
+
+    y += 2;
+
+    // ── Barra progresso BEP ─────────────────────────────────────
+    if (bep > 0) {
+      y = sectionTitle('Avanzamento verso il break even', y);
+      y += 2;
+      const barW = W - M*2;
+      const fill = Math.min(1, totImponibile / bep);
+      doc.setFillColor(20, 23, 32); doc.roundedRect(M, y, barW, 5, 1, 1, 'F');
+      const fillColor = fill >= 1 ? [61,214,140] : fill > 0.7 ? [232,184,75] : [232,75,75];
+      doc.setFillColor(...fillColor);
+      doc.roundedRect(M, y, Math.max(2, barW * fill), 5, 1, 1, 'F');
+      doc.setFontSize(6.5); doc.setTextColor(...fillColor); doc.setFont('helvetica','bold');
+      doc.text(`${Math.round(fill*100)}%  ${euro(totImponibile)} / ${euro(bep)}`, M + 2, y + 3.5);
+      y += 10;
+    }
+
+    // ── Analisi margine per categoria ──────────────────────────
+    y = sectionTitle('Analisi per categoria', y);
+    y += 1;
+
+    const colW = [72, 25, 32, 32, 21];
+    y = tableRow(['Categoria', {text:'Qtà',align:'right'}, {text:'Incasso',align:'right'}, {text:'Margine',align:'right'}, {text:'Marg.%',align:'right'}], colW, y, true);
+
+    topCat.forEach(([cat, v], i) => {
+      checkPage(8);
+      const mp = v.incasso > 0 ? v.margine/v.incasso*100 : 0;
+      const cols = [
+        cat.replace(/--/g,'').trim(),
+        { text: Math.round(v.qty).toString(), align:'right' },
+        { text: euro(v.incasso), align:'right', color:'gold' },
+        { text: euro(v.margine), align:'right', color: v.margine>=0?'grn':'red' },
+        { text: perc(mp), align:'right', color: mp>=40?'grn':mp>=20?'gold':'red' },
+      ];
+      y = tableRow(cols, colW, y, false, i%2===1);
+    });
+
+    // ════════════════════════════════════════════════════════
+    // PAGINA 2 — TOP PRODOTTI
+    // ════════════════════════════════════════════════════════
+    addPage();
+    doc.setFillColor(7, 9, 12); doc.rect(0, 0, W, 297, 'F');
+    headerPagina();
+
+    doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(232, 184, 75);
+    doc.text('Top Prodotti', M, y);
+    y += 3;
+    doc.setDrawColor(232, 184, 75); doc.setLineWidth(0.3);
+    doc.line(M, y, W - M, y);
+    y += 8;
+
+    y = sectionTitle('Prodotti per incasso (top 15)', y);
+    y += 1;
+
+    const colP = [78, 15, 32, 32, 21, 4];
+    y = tableRow(['Prodotto', {text:'Qtà',align:'right'}, {text:'Incasso',align:'right'}, {text:'Margine',align:'right'}, {text:'Marg.%',align:'right'}, ''], colP, y, true);
+
+    topProd.forEach(([prod, v], i) => {
+      checkPage(8);
+      const mp = v.incasso > 0 ? v.margine/v.incasso*100 : 0;
+      // Medaglia top 3
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+      const cols = [
+        prod.substring(0,32),
+        { text: Math.round(v.qty).toString(), align:'right' },
+        { text: euro(v.incasso), align:'right', color:'gold' },
+        { text: euro(v.margine), align:'right', color: v.margine>=0?'grn':'red' },
+        { text: perc(mp), align:'right', color: mp>=40?'grn':mp>=20?'gold':'red' },
+        i < 3 ? String(i+1) : '',
+      ];
+      y = tableRow(cols, colP, y, false, i%2===1);
+    });
+
+    y += 8;
+
+    // ── Riepilogo bottom ─────────────────────────────────────────
+    y = sectionTitle('Note e legenda', y);
+    y += 4;
+    doc.setFontSize(7); doc.setTextColor(107,114,128); doc.setFont('helvetica','normal');
+    const note = [
+      '• Incasso lordo: comprensivo di IVA al 10%',
+      '• Incasso imponibile: al netto IVA',
+      '• Margine: ricavi imponibili meno costi del venduto (food & drink cost)',
+      '• Margine effettivo: margine al netto dei costi fissi',
+      '• Break Even: incasso imponibile necessario per coprire tutti i costi',
+      `• Documento generato automaticamente da EGO Dashboard il ${oggi}`,
+    ];
+    note.forEach(n => { doc.text(n, M, y); y += 5; });
+
+    // Numero pagine
+    const totalPages = doc.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setFontSize(6.5); doc.setTextColor(107,114,128); doc.setFont('helvetica','normal');
+      doc.text(`Pagina ${p} di ${totalPages}`, W - M, 292, { align:'right' });
+    }
+
+    // Scarica
+    const filename = `report-${title.replace(/[^a-z0-9]/gi,'-').toLowerCase()}-${oggi.replace(/\//g,'-')}.pdf`;
+    doc.save(filename);
+
+  } catch(e) {
+    alert('Errore generazione PDF: ' + e.message);
+    console.error(e);
+  } finally {
+    btn.textContent = '📄 PDF';
+    btn.disabled = false;
+  }
+}
+
 async function faiScreenshot() {
   const btn = document.getElementById('btn-screenshot');
   btn.textContent = '⏳';
