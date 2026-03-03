@@ -2490,8 +2490,8 @@ async function generaPrevisioni() {
     return d.getFullYear() === anno && d.getMonth() === mese;
   }).sort((a,b) => a.data.localeCompare(b.data));
 
-  if (chiusureMese.length < 3) {
-    body.innerHTML = '<div style="font-size:0.75rem;color:var(--text3);font-family:\'Barlow Condensed\',sans-serif">Servono almeno 3 chiusure nel mese per generare previsioni.</div>';
+  if (chiusureMese.length < 1) {
+    body.innerHTML = '<div style="font-size:0.75rem;color:var(--text3);font-family:\'Barlow Condensed\',sans-serif">Nessuna chiusura registrata questo mese.</div>';
     return;
   }
 
@@ -2703,8 +2703,8 @@ function aggiornaWidgetObiettivo() {
 
   widget.style.display = 'block';
 
-  // Mostra pannello previsioni solo per il mese corrente
-  mostraPannoPrevisioni(isOggi && chiusureMese.length >= 3);
+  // Mostra pannello previsioni solo per il mese corrente (anche con 1 sola chiusura)
+  mostraPannoPrevisioni(isOggi && chiusureMese.length >= 1);
   // Resetta cache se cambio mese (così richiede nuovo AI al cambio)
   if (!isOggi) previsioniCache = {};
 
