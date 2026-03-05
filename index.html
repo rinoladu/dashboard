@@ -1052,7 +1052,7 @@ body.light .emoji-btn { background: #e8eaed; }
 <!-- ===== FIREBASE ===== -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signInWithEmailAndPassword, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, query, orderBy, updateDoc }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -1086,7 +1086,14 @@ window.loginGoogle = async () => {
   try {
     setSyncStatus('syncing', 'Accesso...');
     document.getElementById('login-error').textContent = '';
-    await signInWithPopup(auth, provider);
+    // Safari/iOS non supporta popup — usa redirect
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isSafari || isIOS) {
+      await signInWithRedirect(auth, provider);
+    } else {
+      await signInWithPopup(auth, provider);
+    }
   } catch(e) {
     setSyncStatus('error', 'Errore login');
     document.getElementById('login-error').textContent = 'Errore accesso Google';
@@ -1126,6 +1133,9 @@ window._savePreferenza = async (chiave, valore) => {
   const ref = doc(db, 'users', adminUid, 'preferenze', chiave);
   await setDoc(ref, { valore });
 };
+
+// Gestisci risultato redirect (Safari/iOS)
+getRedirectResult(auth).catch(() => {});
 
 onAuthStateChanged(auth, async user => {
   if (user) {
