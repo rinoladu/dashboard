@@ -2781,26 +2781,22 @@ function mostraPannoPrevisioni(show) {
   if (panel) panel.style.display = show ? 'block' : 'none';
 }
 
-async function generaPrevisioni() {
+function generaPrevisioni() {
   const btn = document.getElementById('btn-genera-prev');
   const body = document.getElementById('previsioni-body');
   const ora = new Date();
   const anno = ora.getFullYear();
   const mese = ora.getMonth();
 
-  // Solo mese corrente
   if (obiettivoMeseSelezionato !== mese || obiettivoAnnoSelezionato !== anno) {
-    body.innerHTML = '<div style="font-size:0.75rem;color:var(--text3);font-family:\'Barlow Condensed\',sans-serif">Le previsioni AI sono disponibili solo per il mese corrente.</div>';
+    body.innerHTML = '<div style="font-size:0.75rem;color:var(--text3);font-family:sans-serif">Le previsioni sono disponibili solo per il mese corrente.</div>';
     return;
   }
 
-  const cacheKey = `${anno}-${mese}`;
-  if (previsioniCache[cacheKey]) {
-    renderPrevisioni(previsioniCache[cacheKey]);
-    return;
-  }
+  const cacheKey = anno + '-' + mese;
+  if (previsioniCache[cacheKey]) { renderPrevisioni(previsioniCache[cacheKey]); return; }
 
-  // Raccogli dati mese corrente
+  // ── Dati mese corrente ──────────────────────────────────────────
   const chiusureMese = CHIUSURE.filter(c => {
     if ((c.tipo || 'giorno') !== 'giorno') return false;
     const d = new Date(c.data + 'T00:00:00');
@@ -2808,126 +2804,147 @@ async function generaPrevisioni() {
   }).sort((a,b) => a.data.localeCompare(b.data));
 
   if (chiusureMese.length < 1) {
-    body.innerHTML = '<div style="font-size:0.75rem;color:var(--text3);font-family:\'Barlow Condensed\',sans-serif">Nessuna chiusura registrata questo mese.</div>';
+    body.innerHTML = '<div style="font-size:0.75rem;color:var(--text3);font-family:sans-serif">Nessuna chiusura registrata questo mese.</div>';
     return;
   }
 
-  // Raccogli dati mese precedente (confronto storico)
-  const mesePrecMese = mese === 0 ? 11 : mese - 1;
-  const mesePrecAnno = mese === 0 ? anno - 1 : anno;
-  const chiusurePrec = CHIUSURE.filter(c => {
-    if ((c.tipo || 'giorno') !== 'giorno') return false;
-    const d = new Date(c.data + 'T00:00:00');
-    return d.getFullYear() === mesePrecAnno && d.getMonth() === mesePrecMese;
-  });
-
-  const nomeMesi = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  const lordo = c => c.totLordo || (c.totImponibile || 0) * 1.10;
   const giorniNelMese = new Date(anno, mese + 1, 0).getDate();
   const giornoOggi = ora.getDate();
   const giorniRimasti = giorniNelMese - giornoOggi;
-  const totaleFinora = chiusureMese.reduce((s,c) => s + (c.totLordo||(c.totImponibile||0)*1.10), 0);
-  const mediaGiornaliera = totaleFinora / chiusureMese.length;
-  const totPrecMese = chiusurePrec.reduce((s,c) => s + (c.totLordo||(c.totImponibile||0)*1.10), 0);
+  const totaleFinora = chiusureMese.reduce((s,c) => s + lordo(c), 0);
+  const n = chiusureMese.length;
+  const mediaGiornaliera = totaleFinora / n;
   const obiettivo = getObiettivoSalvato();
 
-  // Calcola proiezione locale (senza AI) per mostrare subito
-  const proiezioneLineare = totaleFinora + (mediaGiornaliera * (giorniRimasti * chiusureMese.length / giornoOggi));
+  // ── Trend: ultimi 3 vs primi giorni ────────────────────────────
+  const valori = chiusureMese.map(c => lordo(c));
+  const trend3 = n >= 3 ? valori.slice(-3).reduce((s,v)=>s+v,0)/3 : mediaGiornaliera;
+  const trend7 = n >= 7 ? valori.slice(-7).reduce((s,v)=>s+v,0)/7 : mediaGiornaliera;
+  const primiN = Math.max(1, Math.floor(n/2));
+  const mediaInizio = valori.slice(0, primiN).reduce((s,v)=>s+v,0) / primiN;
+  const mediaFine = valori.slice(-primiN).reduce((s,v)=>s+v,0) / primiN;
+  const trendDirezione = mediaFine - mediaInizio; // positivo = crescita
 
-  // Mostra loading + risultati parziali subito
-  btn.disabled = true;
-  btn.textContent = '⏳';
-  body.innerHTML = `
-    <div class="previsioni-proiezione">
-      <div class="prev-ring-wrap">
-        <svg width="64" height="64" viewBox="0 0 64 64">
-          <circle class="prev-ring-bg" cx="32" cy="32" r="26"/>
-          <circle class="prev-ring-fill" id="prev-ring" cx="32" cy="32" r="26"
-            stroke-dasharray="163.4" stroke-dashoffset="${obiettivo > 0 ? 163.4 - Math.min(1,(proiezioneLineare/obiettivo))*(163.4) : 80}"
-            style="stroke:var(--accent2)"/>
-        </svg>
-        <div class="prev-ring-text">
-          <div class="prev-ring-val">${obiettivo > 0 ? Math.round(Math.min(150,proiezioneLineare/obiettivo*100)) : '~'}${obiettivo > 0 ? '%' : ''}</div>
-          <div class="prev-ring-lbl">prev.</div>
-        </div>
-      </div>
-      <div class="prev-stats">
-        <div class="prev-stat-row">
-          <div class="prev-stat-label">Proiezione a fine mese</div>
-          <div class="prev-stat-value blue" id="prev-proiezione">${fmt(proiezioneLineare)}</div>
-        </div>
-        <div class="prev-stat-row">
-          <div class="prev-stat-label">Media giornaliera attuale</div>
-          <div class="prev-stat-value acc">${fmt(mediaGiornaliera)}</div>
-        </div>
-        <div class="prev-stat-row">
-          <div class="prev-stat-label">Giorni rimasti</div>
-          <div class="prev-stat-value">${giorniRimasti} gg (su ${giorniNelMese})</div>
-        </div>
-      </div>
-    </div>
-    ${renderAlertTrend(totaleFinora, proiezioneLineare, obiettivo, giornoOggi, giorniNelMese)}
-    <div class="previsioni-loading" id="ai-loading">
-      <div class="dots"><span></span><span></span><span></span></div>
-      Analisi AI in corso...
-    </div>
-  `;
-
-  // Chiama API Claude per analisi qualitativa
-  try {
-    const giorni7 = chiusureMese.slice(-7);
-    const trend7 = giorni7.reduce((s,c)=>s+(c.totLordo||(c.totImponibile||0)*1.10),0)/giorni7.length;
-    const trend3 = chiusureMese.slice(-3).reduce((s,c)=>s+(c.totLordo||(c.totImponibile||0)*1.10),0)/3;
-
-    const prompt = `Sei un analista finanziario per un ristorante italiano. Analizza questi dati e fornisci:
-1. Una valutazione del trend (2-3 righe max)
-2. Un alert chiaro: sei IN TREND, SOTTO TREND o IN DIFFICOLTÀ?
-3. 1 consiglio pratico specifico
-
-DATI MESE ${nomeMesi[mese]} ${anno}:
-- Chiusure registrate: ${chiusureMese.length} giorni su ${giornoOggi} aperti
-- Incassato finora (lordo IVA): €${Math.round(totaleFinora).toLocaleString('it-IT')}
-- Media giornaliera: €${Math.round(mediaGiornaliera).toLocaleString('it-IT')}
-- Trend ultimi 7gg: €${Math.round(trend7).toLocaleString('it-IT')}/giorno
-- Trend ultimi 3gg: €${Math.round(trend3).toLocaleString('it-IT')}/giorno
-- Proiezione fine mese: €${Math.round(proiezioneLineare).toLocaleString('it-IT')}
-${obiettivo > 0 ? `- Obiettivo mensile: €${Math.round(obiettivo).toLocaleString('it-IT')}` : '- Obiettivo mensile: non impostato'}
-${totPrecMese > 0 ? `- Mese precedente totale: €${Math.round(totPrecMese).toLocaleString('it-IT')}` : ''}
-
-Rispondi in italiano, tono diretto e professionale, max 4 righe totali. NON usare emoji né markdown.`;
-
-    const apiKey = window.ANTHROPIC_API_KEY || localStorage.getItem('anthropic_api_key') || '';
-    if (!apiKey) {
-      const k = prompt('Inserisci la tua Anthropic API Key (verrà salvata localmente):');
-      if (!k) { document.getElementById('ai-loading').innerHTML = '<span style="color:var(--text3);font-size:0.72rem">API Key non inserita.</span>'; btn.disabled=false; btn.textContent='✦ Genera'; return; }
-      localStorage.setItem('anthropic_api_key', k);
-      window.ANTHROPIC_API_KEY = k;
-    }
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': window.ANTHROPIC_API_KEY || localStorage.getItem('anthropic_api_key'),
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await resp.json();
-    const testo = data.content?.[0]?.text || 'Analisi non disponibile.';
-
-    const result = { proiezioneLineare, mediaGiornaliera, giorniRimasti, giorniNelMese, totaleFinora, obiettivo, testo, giornoOggi };
-    previsioniCache[cacheKey] = result;
-    renderPrevisioni(result);
-  } catch(e) {
-    document.getElementById('ai-loading').innerHTML = '<span style="color:var(--text3);font-size:0.72rem">Analisi AI non disponibile — verifica connessione.</span>';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '↺ Aggiorna';
+  // ── Regressione lineare semplice per proiezione pesata ─────────
+  let sumX=0, sumY=0, sumXY=0, sumX2=0;
+  valori.forEach((v,i) => { sumX+=i; sumY+=v; sumXY+=i*v; sumX2+=i*i; });
+  const slope = n > 1 ? (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX) : 0;
+  const intercept = (sumY - slope*sumX) / n;
+  // Proiezione: media pesata tra lineare e regressione
+  const chiusurePreviste = Math.round(giorniRimasti * n / Math.max(1, giornoOggi));
+  const ultimoIdx = n - 1;
+  let proiezioneTrend = totaleFinora;
+  for (let i = 1; i <= chiusurePreviste; i++) {
+    proiezioneTrend += Math.max(0, intercept + slope * (ultimoIdx + i));
   }
+  const proiezioneLineare = totaleFinora + mediaGiornaliera * chiusurePreviste;
+  // Blend: 60% trend, 40% lineare
+  const proiezione = proiezioneTrend * 0.6 + proiezioneLineare * 0.4;
+
+  // ── Variabilità (deviazione standard) ──────────────────────────
+  const media = totaleFinora / n;
+  const variance = valori.reduce((s,v) => s + Math.pow(v-media,2), 0) / n;
+  const stdDev = Math.sqrt(variance);
+  const proiezioneMin = totaleFinora + Math.max(0, mediaGiornaliera - stdDev) * chiusurePreviste;
+  const proiezioneMax = totaleFinora + (mediaGiornaliera + stdDev) * chiusurePreviste;
+
+  // ── Confronto mese precedente ───────────────────────────────────
+  const mesePrecMese = mese === 0 ? 11 : mese - 1;
+  const mesePrecAnno = mese === 0 ? anno - 1 : anno;
+  const chiusurePrec = CHIUSURE.filter(c => {
+    if ((c.tipo||'giorno') !== 'giorno') return false;
+    const d = new Date(c.data + 'T00:00:00');
+    return d.getFullYear() === mesePrecAnno && d.getMonth() === mesePrecMese;
+  });
+  const totPrec = chiusurePrec.reduce((s,c) => s + lordo(c), 0);
+  // Confronto stesso numero di giorni del mese prec
+  const chiusurePrecSameN = chiusurePrec.slice(0, n);
+  const totPrecSameN = chiusurePrecSameN.reduce((s,c) => s + lordo(c), 0);
+  const deltaVsMesePrecPerc = totPrecSameN > 0 ? ((totaleFinora - totPrecSameN) / totPrecSameN * 100) : null;
+
+  // ── Giorno di raggiungimento break-even ────────────────────────
+  let giornoBEP = null;
+  if (obiettivo > 0 && totaleFinora < obiettivo && mediaGiornaliera > 0) {
+    const mancante = obiettivo - totaleFinora;
+    const giorniNecessari = Math.ceil(mancante / mediaGiornaliera * (giornoOggi / n));
+    giornoBEP = giornoOggi + giorniNecessari;
+    if (giornoBEP > giorniNelMese) giornoBEP = null; // fuori mese
+  }
+
+  // ── Genera testo analisi locale ─────────────────────────────────
+  const testo = generaTestoAnalisi({
+    n, giornoOggi, giorniNelMese, totaleFinora, mediaGiornaliera,
+    trend3, trend7, trendDirezione, proiezione, obiettivo,
+    deltaVsMesePrecPerc, giornoBEP, stdDev, slope, chiusurePreviste
+  });
+
+  const result = {
+    proiezioneLineare: proiezione, proiezioneMin, proiezioneMax,
+    mediaGiornaliera, giorniRimasti, giorniNelMese, totaleFinora,
+    obiettivo, testo, giornoOggi, trend3, trend7, trendDirezione,
+    deltaVsMesePrecPerc, giornoBEP, slope, n
+  };
+  previsioniCache[cacheKey] = result;
+  renderPrevisioni(result);
+  btn.textContent = '↺ Aggiorna';
+}
+
+function generaTestoAnalisi(p) {
+  const { n, giornoOggi, giorniNelMese, totaleFinora, mediaGiornaliera,
+    trend3, trend7, trendDirezione, proiezione, obiettivo,
+    deltaVsMesePrecPerc, giornoBEP, stdDev, slope, chiusurePreviste } = p;
+
+  const lines = [];
+  const nomeMesi = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  const ora = new Date();
+
+  // 1. ANDAMENTO TREND
+  const varPerc = mediaGiornaliera > 0 ? ((trend3 - mediaGiornaliera) / mediaGiornaliera * 100) : 0;
+  if (Math.abs(slope) < 50 && n >= 3) {
+    lines.push('📊 Andamento stabile: la media degli ultimi 3 giorni (' + fmt(trend3) + ') è in linea con la media mensile.');
+  } else if (slope > 0 && n >= 3) {
+    lines.push('📈 Trend in crescita: gli ultimi 3 giorni (' + fmt(trend3) + ') sono ' + Math.abs(varPerc).toFixed(0) + '% sopra la media mensile (' + fmt(mediaGiornaliera) + ').');
+  } else if (slope < 0 && n >= 3) {
+    lines.push('📉 Trend in calo: gli ultimi 3 giorni (' + fmt(trend3) + ') sono ' + Math.abs(varPerc).toFixed(0) + '% sotto la media mensile (' + fmt(mediaGiornaliera) + ').');
+  } else {
+    lines.push('📊 Dati iniziali: media giornaliera di ' + fmt(mediaGiornaliera) + ' su ' + n + ' chiusure registrate.');
+  }
+
+  // 2. CONFRONTO MESE PRECEDENTE
+  if (deltaVsMesePrecPerc !== null) {
+    const segno = deltaVsMesePrecPerc >= 0 ? '+' : '';
+    const color = deltaVsMesePrecPerc >= 0 ? '🟢' : '🔴';
+    lines.push(color + ' Vs. mese precedente (stessi giorni): ' + segno + deltaVsMesePrecPerc.toFixed(1) + '% (' + fmt(totaleFinora) + ' vs periodo precedente).');
+  }
+
+  // 3. PROIEZIONE E OBIETTIVO
+  if (obiettivo > 0) {
+    const attesoProp = obiettivo * (giornoOggi / giorniNelMese);
+    const rapporto = totaleFinora / attesoProp;
+    if (rapporto >= 1.05) {
+      lines.push('✅ In anticipo sul target: sei al ' + (totaleFinora/obiettivo*100).toFixed(0) + '% dell\'obiettivo a ' + giornoOggi + '/' + giorniNelMese + ' del mese.');
+    } else if (rapporto >= 0.9) {
+      lines.push('⚡ In linea con il target: proiezione ' + fmt(proiezione) + ' vs obiettivo ' + fmt(obiettivo) + '.');
+    } else {
+      lines.push('⚠️ Sotto ritmo: a questo passo la proiezione (' + fmt(proiezione) + ') è ' + fmt(proiezione - obiettivo) + ' sotto l\'obiettivo.');
+    }
+    if (giornoBEP) {
+      lines.push('🎯 Break-even stimato entro il giorno ' + giornoBEP + ' del mese (in ' + (giornoBEP - giornoOggi) + ' giorni).');
+    }
+  } else {
+    lines.push('💡 Imposta un obiettivo mensile nel widget per ricevere analisi più precise.');
+  }
+
+  // 4. CONSIGLIO SPECIFICO basato su variabilità
+  const cv = mediaGiornaliera > 0 ? (stdDev / mediaGiornaliera) : 0;
+  if (cv > 0.4) {
+    lines.push('💡 Alta variabilità nei dati (' + (cv*100).toFixed(0) + '%): l\'andamento è irregolare, la proiezione ha margine di incertezza di +/-' + fmt(stdDev * chiusurePreviste) + '.');
+  } else if (cv < 0.15 && n >= 5) {
+    lines.push('💡 Dati molto consistenti (variabilità ' + (cv*100).toFixed(0) + '%): la proiezione è affidabile.');
+  }
+
+  return lines.join('<br>');
 }
 
 function renderAlertTrend(totaleFinora, proiezione, obiettivo, giornoOggi, giorniNelMese) {
@@ -2939,55 +2956,71 @@ function renderAlertTrend(totaleFinora, proiezione, obiettivo, giornoOggi, giorn
   let classe, icona, testo;
   if (rapporto >= 1.05) {
     classe = 'ok'; icona = '↑';
-    testo = `In anticipo sul target. Proiezione +${Math.abs(diffPerc)}% sopra obiettivo (${fmt(proiezione - obiettivo)} surplus).`;
+    testo = 'In anticipo sul target. Proiezione +' + Math.abs(diffPerc) + '% sopra obiettivo (' + fmt(proiezione - obiettivo) + ' surplus).';
   } else if (rapporto >= 0.9) {
     classe = 'warn'; icona = '→';
-    testo = `In linea con il target. Proiezione ${diffPerc > 0 ? '+' : ''}${diffPerc}% rispetto all'obiettivo.`;
+    testo = 'In linea con il target. Proiezione ' + (diffPerc > 0 ? '+' : '') + diffPerc + '% rispetto all\'obiettivo.';
   } else {
     classe = 'danger'; icona = '↓';
-    testo = `Sotto trend. Proiezione ${fmt(proiezione - obiettivo)} sotto obiettivo. Serve +${fmt((obiettivo - totaleFinora) / Math.max(1, giorniNelMese - giornoOggi))}/giorno nei giorni rimasti.`;
+    testo = 'Sotto trend. Proiezione ' + fmt(proiezione - obiettivo) + ' sotto obiettivo. Serve +' + fmt((obiettivo - totaleFinora) / Math.max(1, giorniNelMese - giornoOggi)) + '/giorno.';
   }
-  return `<div class="previsioni-alert ${classe}">${icona} ${testo}</div>`;
+  return '<div class="previsioni-alert ' + classe + '">' + icona + ' ' + testo + '</div>';
 }
 
 function renderPrevisioni(r) {
   const body = document.getElementById('previsioni-body');
   if (!body) return;
-  const { proiezioneLineare, mediaGiornaliera, giorniRimasti, giorniNelMese, totaleFinora, obiettivo, testo, giornoOggi } = r;
+  const { proiezioneLineare, proiezioneMin, proiezioneMax, mediaGiornaliera,
+    giorniRimasti, giorniNelMese, totaleFinora, obiettivo, testo,
+    giornoOggi, trend3, trendDirezione, deltaVsMesePrecPerc, giornoBEP, n } = r;
+
   const percAnello = obiettivo > 0 ? Math.min(163.4, (proiezioneLineare/obiettivo)*163.4) : 82;
   const percVal = obiettivo > 0 ? Math.round(Math.min(150, proiezioneLineare/obiettivo*100)) : '~';
+  const colorAnello = proiezioneLineare >= obiettivo && obiettivo > 0 ? 'var(--green)' : 'var(--accent2)';
+  const trendIcon = trendDirezione > 50 ? '↗' : trendDirezione < -50 ? '↘' : '→';
+  const trendColor = trendDirezione > 50 ? 'var(--green)' : trendDirezione < -50 ? 'var(--red)' : 'var(--accent)';
 
   body.innerHTML = `
     <div class="previsioni-proiezione">
       <div class="prev-ring-wrap">
         <svg width="64" height="64" viewBox="0 0 64 64">
           <circle class="prev-ring-bg" cx="32" cy="32" r="26"/>
-          <circle class="prev-ring-fill" id="prev-ring" cx="32" cy="32" r="26"
+          <circle class="prev-ring-fill" cx="32" cy="32" r="26"
             stroke-dasharray="163.4" stroke-dashoffset="${163.4 - percAnello}"
-            style="stroke:${proiezioneLineare >= obiettivo && obiettivo > 0 ? 'var(--green)' : 'var(--accent2)'}"/>
+            style="stroke:${colorAnello}"/>
         </svg>
         <div class="prev-ring-text">
-          <div class="prev-ring-val" style="color:${proiezioneLineare >= obiettivo && obiettivo > 0 ? 'var(--green)' : 'var(--accent2)'}">${percVal}${obiettivo > 0 ? '%' : ''}</div>
+          <div class="prev-ring-val" style="color:${colorAnello}">${percVal}${obiettivo > 0 ? '%' : ''}</div>
           <div class="prev-ring-lbl">prev.</div>
         </div>
       </div>
       <div class="prev-stats">
         <div class="prev-stat-row">
-          <div class="prev-stat-label">Proiezione a fine mese</div>
+          <div class="prev-stat-label">Proiezione fine mese</div>
           <div class="prev-stat-value ${proiezioneLineare >= obiettivo && obiettivo > 0 ? 'grn' : 'blue'}">${fmt(proiezioneLineare)}</div>
         </div>
         <div class="prev-stat-row">
-          <div class="prev-stat-label">Media giornaliera attuale</div>
-          <div class="prev-stat-value acc">${fmt(mediaGiornaliera)}</div>
+          <div class="prev-stat-label">Forcella (min — max)</div>
+          <div class="prev-stat-value" style="font-size:0.82rem">${fmt(proiezioneMin)} — ${fmt(proiezioneMax)}</div>
         </div>
         <div class="prev-stat-row">
-          <div class="prev-stat-label">Giorni rimasti</div>
-          <div class="prev-stat-value">${giorniRimasti} gg (su ${giorniNelMese})</div>
+          <div class="prev-stat-label">Trend ultimi 3gg</div>
+          <div class="prev-stat-value" style="color:${trendColor}">${trendIcon} ${fmt(trend3)}/gg</div>
         </div>
+        ${deltaVsMesePrecPerc !== null ? `
+        <div class="prev-stat-row">
+          <div class="prev-stat-label">Vs. mese precedente</div>
+          <div class="prev-stat-value ${deltaVsMesePrecPerc >= 0 ? 'grn' : 'red'}">${deltaVsMesePrecPerc >= 0 ? '+' : ''}${deltaVsMesePrecPerc.toFixed(1)}%</div>
+        </div>` : ''}
+        ${giornoBEP ? `
+        <div class="prev-stat-row">
+          <div class="prev-stat-label">Break-even stimato</div>
+          <div class="prev-stat-value acc">giorno ${giornoBEP}</div>
+        </div>` : ''}
       </div>
     </div>
     ${renderAlertTrend(totaleFinora, proiezioneLineare, obiettivo, giornoOggi, giorniNelMese)}
-    ${testo ? `<div class="previsioni-ai-testo">✦ ${testo}</div>` : ''}
+    ${testo ? `<div class="previsioni-ai-testo">${testo}</div>` : ''}
   `;
 }
 
