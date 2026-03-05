@@ -1015,6 +1015,14 @@ body.light .emoji-btn { background: #e8eaed; }
         onfocus="this.style.borderColor='rgba(232,184,75,0.4)'" onblur="this.style.borderColor=''">
       <div style="color:var(--text3);font-size:0.7rem;margin-top:0.3rem" id="obiettivo-suggerimento"></div>
     </div>
+    <div style="margin-top:1rem;padding:0.8rem;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">
+      <div style="font-size:0.65rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--text3);margin-bottom:0.5rem">&#x1F916; API Key Previsioni AI</div>
+      <div style="font-size:0.7rem;color:var(--text3);margin-bottom:0.5rem" id="obiettivo-api-hint"></div>
+      <div style="display:flex;gap:0.5rem">
+        <button onclick="impostaAPIKey()" style="flex:1;background:rgba(75,157,232,0.12);border:1px solid rgba(75,157,232,0.3);color:var(--accent2);border-radius:8px;padding:0.5rem;font-size:0.75rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer">Imposta chiave</button>
+        <button onclick="cancellaAPIKey()" style="background:rgba(232,75,75,0.08);border:1px solid rgba(232,75,75,0.2);color:var(--red);border-radius:8px;padding:0.5rem;font-size:0.75rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer">Cancella</button>
+      </div>
+    </div>
     <button class="btn-save-note" onclick="salvaObiettivo()" style="margin-top:1.2rem">Salva obiettivo</button>
   </div>
 </div>
@@ -2887,11 +2895,23 @@ ${totPrecMese > 0 ? `- Mese precedente totale: €${Math.round(totPrecMese).toLo
 
 Rispondi in italiano, tono diretto e professionale, max 4 righe totali. NON usare emoji né markdown.`;
 
+    const apiKey = window.ANTHROPIC_API_KEY || localStorage.getItem('anthropic_api_key') || '';
+    if (!apiKey) {
+      const k = prompt('Inserisci la tua Anthropic API Key (verrà salvata localmente):');
+      if (!k) { document.getElementById('ai-loading').innerHTML = '<span style="color:var(--text3);font-size:0.72rem">API Key non inserita.</span>'; btn.disabled=false; btn.textContent='✦ Genera'; return; }
+      localStorage.setItem('anthropic_api_key', k);
+      window.ANTHROPIC_API_KEY = k;
+    }
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': window.ANTHROPIC_API_KEY || localStorage.getItem('anthropic_api_key'),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
         messages: [{ role: 'user', content: prompt }]
       })
@@ -3100,6 +3120,11 @@ function apriImpostazioniObiettivo() {
     sugEl.textContent = 'Carica una chiusura mensile per il suggerimento automatico.';
   }
 
+  // Mostra chiave API salvata (mascherata)
+  const savedKey = localStorage.getItem('anthropic_api_key') || '';
+  const sugEl2 = document.getElementById('obiettivo-api-hint');
+  if (sugEl2) sugEl2.textContent = savedKey ? '✅ API Key AI salvata — ' : '⚠️ Nessuna API Key AI impostata — ';
+
   document.getElementById('obiettivo-modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
   setTimeout(() => document.getElementById('obiettivo-input').focus(), 300);
@@ -3110,6 +3135,24 @@ function salvaObiettivo() {
   localStorage.setItem(getObiettivoKey(), val);
   closeObiettivoModal();
   aggiornaWidgetObiettivo();
+}
+
+function impostaAPIKey() {
+  const k = prompt('Inserisci la tua Anthropic API Key\n(inizia con sk-ant-...)');
+  if (k && k.trim()) {
+    localStorage.setItem('anthropic_api_key', k.trim());
+    window.ANTHROPIC_API_KEY = k.trim();
+    const hint = document.getElementById('obiettivo-api-hint');
+    if (hint) hint.textContent = '✅ API Key salvata correttamente';
+  }
+}
+
+function cancellaAPIKey() {
+  if (!confirm('Rimuovere la API Key salvata?')) return;
+  localStorage.removeItem('anthropic_api_key');
+  window.ANTHROPIC_API_KEY = '';
+  const hint = document.getElementById('obiettivo-api-hint');
+  if (hint) hint.textContent = '⚠️ Nessuna API Key impostata';
 }
 
 function closeObiettivoModal() {
