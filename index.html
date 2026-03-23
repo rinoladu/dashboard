@@ -447,6 +447,43 @@ body {
 body.light .previsioni-panel { background: #fff; }
 body.light .prev-ring-bg { stroke: rgba(0,0,0,0.06); }
 
+/* ===== TOOLTIP CATEGORIA ===== */
+.cat-tooltip {
+  position: fixed; z-index: 9999;
+  background: #0f1319; border: 1px solid var(--border);
+  border-radius: 12px; padding: 0.7rem 0.9rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  min-width: 200px; max-width: 280px;
+  pointer-events: none; opacity: 0;
+  transition: opacity 0.15s ease;
+  font-family: 'Barlow Condensed', sans-serif;
+}
+.cat-tooltip.visible { opacity: 1; }
+.cat-tooltip-title {
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--text3); margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border); padding-bottom: 0.4rem;
+}
+.cat-tooltip-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; padding: 0.2rem 0;
+}
+.cat-tooltip-rank {
+  font-size: 0.65rem; font-weight: 800; color: var(--text3);
+  min-width: 16px; text-align: center;
+}
+.cat-tooltip-prod {
+  flex: 1; font-size: 0.78rem; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cat-tooltip-val {
+  font-size: 0.78rem; font-weight: 700; color: var(--accent);
+  white-space: nowrap;
+}
+.stat-table tr.has-tooltip { cursor: pointer; }
+.stat-table tr.has-tooltip:hover td { background: rgba(75,157,232,0.06); }
+body.light .cat-tooltip { background: #fff; }
+
 /* DASHBOARD */
 #dashboard-screen { display: none; }
 .dash-header {
@@ -996,6 +1033,12 @@ body.light .emoji-btn { background: #e8eaed; }
     <button class="btn-stat orange" onclick="openModal('birre-margine')">Birre più margine</button>
   </div>
   <div style="height:2rem"></div>
+</div>
+
+<!-- TOOLTIP CATEGORIA -->
+<div class="cat-tooltip" id="cat-tooltip">
+  <div class="cat-tooltip-title" id="cat-tooltip-title"></div>
+  <div id="cat-tooltip-body"></div>
 </div>
 
 <!-- MODAL OBIETTIVO -->
@@ -2197,9 +2240,9 @@ function filterGroupByMargine(cats,gf,limit){
 function getModalConfig(type){
   const N=10;
   const configs={
-    'cat-vendute':()=>buildBarConfig('🏆 Categorie per Quantità',groupBy('cat','qty'),'qty','pezzi','blue'),
-    'cat-incasso':()=>buildBarConfig('💶 Categorie per Incasso',groupBy('cat','totale'),'totale','€','gold'),
-    'cat-margine':()=>buildMarginConfig('📈 Categorie per Margine',groupByMargine('cat')),
+    'cat-vendute':()=>buildBarConfig('🏆 Categorie per Quantità',groupBy('cat','qty'),'qty','pezzi','blue',true),
+    'cat-incasso':()=>buildBarConfig('💶 Categorie per Incasso',groupBy('cat','totale'),'totale','€','gold',true),
+    'cat-margine':()=>buildMarginConfig('📈 Categorie per Margine',groupByMargine('cat'),true),
     'drink-venduti':()=>buildBarConfig('🍹 Drink più Venduti',filterGroupBy(['--APERITIVI--','--COCKTAIL--','--GIN--','--EGO DRINKS--','--GRAPPE--','--RUM--','--TEQUILA--','--WHISKEY--'],'prodotto','qty',N),'qty','pezzi','blue'),
     'drink-margine':()=>buildMarginConfig('💰 Drink per Margine',filterGroupByMargine(['--APERITIVI--','--COCKTAIL--','--GIN--','--EGO DRINKS--','--GRAPPE--','--RUM--','--TEQUILA--','--WHISKEY--'],'prodotto',N)),
     'pizze-vendute':()=>buildBarConfig('🍕 Pizze più Vendute',filterGroupBy(['--PIZZE CLASSICHE--','--PIZZE CREATIVE--','--PIZZE DOLCI--'],'prodotto','qty',N),'qty','pezzi','blue'),
@@ -2242,21 +2285,108 @@ function getModalConfig(type){
   return fn();
 }
 
-function buildBarConfig(title,data,valField,unit,colorScheme){
+function buildBarConfig(title,data,valField,unit,colorScheme,showTooltip=false){
   if(!data.length) return{title,html:'<div class="no-data">Nessun dato disponibile</div>'};
   const labels=data.map(([k])=>k.replace(/--/g,'').trim());
   const values=data.map(([,v])=>Math.round(v*100)/100);
-  const tableRows=data.map(([k,v],i)=>`<tr><td><span class="badge ${i<3?'gold':'blue'}">${i+1}</span> ${k.replace(/--/g,'').trim()}</td><td class="num">${valField==='totale'?fmt(v):v.toFixed(0)+' '+unit}</td></tr>`).join('');
+  const tableRows=data.map(([k,v],i)=>{
+    const nome = k.replace(/--/g,'').trim();
+    const tooltipAttr = showTooltip ? ` class="has-tooltip" onmouseenter="mostraTooltipCat(event,'${k.replace(/'/g,'\'')}','${valField}')" onmouseleave="nascondiTooltipCat()" ontouchstart="mostraTooltipCat(event,'${k.replace(/'/g,'\'')}','${valField}')" ontouchend="nascondiTooltipCat()"` : '';
+    return `<tr${tooltipAttr}><td><span class="badge ${i<3?'gold':'blue'}">${i+1}</span> ${nome}</td><td class="num">${valField==='totale'?fmt(v):v.toFixed(0)+' '+unit}</td></tr>`;
+  }).join('');
   return{title,unit,chartData:{labels,values},chartType:'bar',colorScheme,html:`<div class="chart-container"><canvas id="main-chart"></canvas></div><table class="stat-table"><thead><tr><th>Prodotto / Categoria</th><th style="text-align:right">${unit==='€'?'Incasso':'Quantità'}</th></tr></thead><tbody>${tableRows}</tbody></table>`};
 }
 
-function buildMarginConfig(title,data){
+function buildMarginConfig(title,data,showTooltip=false){
   if(!data.length) return{title,html:'<div class="no-data">Nessun dato (costi mancanti)</div>'};
   const labels=data.map(([k])=>k.replace(/--/g,'').trim());
   const values=data.map(([,m])=>Math.round(m*100)/100);
-  const tableRows=data.map(([k,m,p],i)=>{const sign=m>=0?'+':'';const col=m>=0?'color:var(--green)':'color:var(--red)';return`<tr><td><span class="badge ${i<3?'gold':'blue'}">${i+1}</span> ${k.replace(/--/g,'').trim()}</td><td class="num" style="${col}">${sign}${fmt(m)}</td><td class="num" style="${col}">${sign}${p.toFixed(1)}%</td></tr>`;}).join('');
+  const tableRows=data.map(([k,m,p],i)=>{
+    const sign=m>=0?'+':''; const col=m>=0?'color:var(--green)':'color:var(--red)';
+    const tooltipAttr = showTooltip ? ` class="has-tooltip" onmouseenter="mostraTooltipCat(event,'${k.replace(/'/g,'\'')}','margine')" onmouseleave="nascondiTooltipCat()" ontouchstart="mostraTooltipCat(event,'${k.replace(/'/g,'\'')}','margine')" ontouchend="nascondiTooltipCat()"` : '';
+    return `<tr${tooltipAttr}><td><span class="badge ${i<3?'gold':'blue'}">${i+1}</span> ${k.replace(/--/g,'').trim()}</td><td class="num" style="${col}">${sign}${fmt(m)}</td><td class="num" style="${col}">${sign}${p.toFixed(1)}%</td></tr>`;
+  }).join('');
   return{title,chartData:{labels,values},chartType:'margine',colorScheme:'mixed',html:`<div class="chart-container"><canvas id="main-chart"></canvas></div><table class="stat-table"><thead><tr><th>Prodotto</th><th style="text-align:right">Margine €</th><th style="text-align:right">%</th></tr></thead><tbody>${tableRows}</tbody></table>`};
 }
+
+// ===== TOOLTIP CATEGORIA =====
+let tooltipTimeout = null;
+
+function mostraTooltipCat(event, catKey, tipoVal) {
+  if (tooltipTimeout) clearTimeout(tooltipTimeout);
+  const tooltip = document.getElementById('cat-tooltip');
+  const titleEl = document.getElementById('cat-tooltip-title');
+  const bodyEl = document.getElementById('cat-tooltip-body');
+  if (!tooltip || !CURRENT_DATA) return;
+
+  // Top 5 prodotti della categoria per il tipo selezionato
+  const prodotti = {};
+  CURRENT_DATA.chiusura.filter(r => r.cat === catKey).forEach(r => {
+    const k = r.prodotto || 'N/D';
+    if (!prodotti[k]) prodotti[k] = { qty:0, incasso:0, margine:0 };
+    prodotti[k].qty += r.qty || 0;
+    prodotti[k].incasso += r.imponibile || 0;
+    prodotti[k].margine += r.margineEuro || 0;
+  });
+
+  const sortField = tipoVal === 'qty' ? 'qty' : tipoVal === 'margine' ? 'margine' : 'incasso';
+  const top5 = Object.entries(prodotti)
+    .sort((a,b) => b[1][sortField] - a[1][sortField])
+    .slice(0, 5);
+
+  if (!top5.length) return;
+
+  const nomecat = catKey.replace(/--/g,'').trim();
+  const labelTipo = tipoVal === 'qty' ? 'Quantità' : tipoVal === 'margine' ? 'Margine' : 'Incasso';
+  titleEl.textContent = nomecat + ' — Top ' + labelTipo;
+
+  const medals = ['🥇','🥈','🥉','4°','5°'];
+  bodyEl.innerHTML = top5.map(([prod, v], i) => {
+    const val = tipoVal === 'qty'
+      ? Math.round(v.qty) + ' pz'
+      : tipoVal === 'margine'
+        ? fmt(v.margine)
+        : fmt(v.incasso);
+    const color = tipoVal === 'margine'
+      ? (v.margine >= 0 ? 'var(--green)' : 'var(--red)')
+      : (i === 0 ? 'var(--accent)' : 'var(--text2)');
+    return '<div class="cat-tooltip-row">' +
+      '<span class="cat-tooltip-rank">' + medals[i] + '</span>' +
+      '<span class="cat-tooltip-prod">' + prod.replace(/--/g,'').trim() + '</span>' +
+      '<span class="cat-tooltip-val" style="color:' + color + '">' + val + '</span>' +
+      '</div>';
+  }).join('');
+
+  // Posiziona il tooltip vicino al cursore/touch
+  const e = event.touches ? event.touches[0] : event;
+  const rect = tooltip.getBoundingClientRect();
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let x = e.clientX + 14, y = e.clientY - 10;
+  if (x + 280 > vw) x = e.clientX - 290;
+  if (y + 180 > vh) y = e.clientY - 190;
+  tooltip.style.left = Math.max(8, x) + 'px';
+  tooltip.style.top = Math.max(8, y) + 'px';
+  tooltip.classList.add('visible');
+}
+
+function nascondiTooltipCat() {
+  tooltipTimeout = setTimeout(() => {
+    const tooltip = document.getElementById('cat-tooltip');
+    if (tooltip) tooltip.classList.remove('visible');
+  }, 150);
+}
+
+// Aggiorna posizione tooltip al movimento del mouse
+document.addEventListener('mousemove', e => {
+  const tooltip = document.getElementById('cat-tooltip');
+  if (!tooltip || !tooltip.classList.contains('visible')) return;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let x = e.clientX + 14, y = e.clientY - 10;
+  if (x + 280 > vw) x = e.clientX - 290;
+  if (y + 180 > vh) y = e.clientY - 190;
+  tooltip.style.left = Math.max(8, x) + 'px';
+  tooltip.style.top = Math.max(8, y) + 'px';
+});
 
 function renderChart(data,type,colorScheme,unit){
   const canvas=document.getElementById('main-chart'); if(!canvas) return;
