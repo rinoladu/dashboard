@@ -2410,10 +2410,10 @@ async function esportaPDF() {
     const title = document.getElementById('dash-title').textContent;
     const subtitle = document.getElementById('dash-subtitle').textContent;
     const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
-    const W = 210, M = 16;
+    const W = 210, M = 14;
     let y = 0;
 
-    // ── Calcoli base ─────────────────────────────────────────────
+    // ── Calcoli ──────────────────────────────────────────────────
     const totImponibile = d.chiusura.reduce((s,r) => s + r.imponibile, 0);
     const totLordo = totImponibile * 1.10;
     const totMargine = d.chiusura.reduce((s,r) => s + r.margineEuro, 0);
@@ -2424,16 +2424,12 @@ async function esportaPDF() {
     const bep = percMarg > 0 ? costiGiorno / percMarg : 0;
     const bepLordo = bep * 1.10;
 
-    // Coperti
-    const copertiRows = d.chiusura.filter(r => {
-      const cat=(r.cat||'').toUpperCase(), prod=(r.prodotto||'').toUpperCase();
-      return (cat.includes('CLIENTE')||cat.includes('COPERTI')) && prod.includes('COPERTO');
-    });
-    const coperti = copertiRows.length > 0 ? Math.round(copertiRows.reduce((s,r)=>s+r.qty,0)) : null;
-
     // Top 5 categorie per quantità
     const bycat = {};
-    d.chiusura.filter(r => !['SERVIZIO','--CLIENTE--'].includes(r.cat) && !r.cat.includes('CLIENTE') && !r.cat.includes('COPERTI')).forEach(r => {
+    d.chiusura.filter(r => {
+      const cat = (r.cat||'').toUpperCase();
+      return !cat.includes('CLIENTE') && !cat.includes('COPERTI') && !cat.includes('SERVIZIO');
+    }).forEach(r => {
       if (!bycat[r.cat]) bycat[r.cat] = { qty:0, incasso:0, margine:0 };
       bycat[r.cat].qty += r.qty || 0;
       bycat[r.cat].incasso += r.imponibile || 0;
@@ -2443,259 +2439,250 @@ async function esportaPDF() {
 
     // Top 5 prodotti per quantità
     const byprod = {};
-    d.chiusura.filter(r => !['SERVIZIO','--CLIENTE--'].includes(r.cat) && !r.cat.includes('CLIENTE') && !r.cat.includes('COPERTI')).forEach(r => {
+    d.chiusura.filter(r => {
+      const cat = (r.cat||'').toUpperCase();
+      return !cat.includes('CLIENTE') && !cat.includes('COPERTI') && !cat.includes('SERVIZIO');
+    }).forEach(r => {
       const k = r.prodotto || 'N/D';
-      if (!byprod[k]) byprod[k] = { qty:0, incasso:0, margine:0, cat: r.cat };
+      if (!byprod[k]) byprod[k] = { qty:0, incasso:0, margine:0 };
       byprod[k].qty += r.qty || 0;
       byprod[k].incasso += r.imponibile || 0;
       byprod[k].margine += r.margineEuro || 0;
     });
     const top5prod = Object.entries(byprod).sort((a,b) => b[1].qty - a[1].qty).slice(0, 5);
 
-    // ── Helpers ───────────────────────────────────────────────────
-    const euro = n => isNaN(n)||n==null ? '—' : new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n);
-    const pct  = n => isNaN(n) ? '—' : n.toFixed(1)+'%';
+    // ── Helpers ──────────────────────────────────────────────────
+    const euro = n => isNaN(n)||n==null ? '---' : new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n);
+    const pct  = n => isNaN(n) ? '---' : n.toFixed(1)+'%';
+    const medals = ['1.','2.','3.','4.','5.'];
 
     const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
 
-    function addPage() { doc.addPage(); y = 22; }
-    function checkY(h=12) { if (y+h > 278) addPage(); }
+    function addPage() { doc.addPage(); y = 20; drawBg(); drawFooter(); }
+    function checkY(h=14) { if (y+h > 275) addPage(); }
 
-    // Sfondo pagina scuro
-    function bgPage() {
+    function drawBg() {
       doc.setFillColor(9, 11, 16);
       doc.rect(0, 0, W, 297, 'F');
     }
 
-    // Header pagina
-    function pageHeader() {
-      doc.setFillColor(18, 21, 30);
-      doc.rect(0, 0, W, 11, 'F');
-      doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(90,97,110);
-      doc.text('EGO DASHBOARD', M, 7.5);
-      doc.text('Generato il ' + oggi, W-M, 7.5, {align:'right'});
+    function drawFooter() {
+      doc.setFillColor(14,17,24);
+      doc.rect(0, 287, W, 10, 'F');
+      const p = doc.getCurrentPageInfo().pageNumber;
+      doc.setFontSize(6); doc.setFont('helvetica','normal'); doc.setTextColor(60,67,80);
+      doc.text('EGO Dashboard  —  Documento riservato  —  ' + oggi, M, 293);
+      doc.text('Pag. ' + p, W-M, 293, {align:'right'});
     }
 
-    // Linea separatrice dorata
-    function goldLine(yy) {
-      doc.setDrawColor(232,184,75); doc.setLineWidth(0.3);
-      doc.line(M, yy, W-M, yy);
-    }
-
-    // Titolo sezione con pillola colorata
-    function sectionHeader(txt, yy, r,g,b) {
-      doc.setFillColor(r||30, g||34, b||48);
-      doc.roundedRect(M, yy-4, W-M*2, 8, 2, 2, 'F');
+    function sectionTitle(txt, yy) {
+      checkY(12);
+      doc.setFillColor(22, 26, 38);
+      doc.rect(M, yy, W-M*2, 7, 'F');
+      // Accent bar sinistra
+      doc.setFillColor(232,184,75);
+      doc.rect(M, yy, 2, 7, 'F');
       doc.setFontSize(7); doc.setFont('helvetica','bold');
-      doc.setTextColor(r ? 255:155, g ? 220:161, b ? 100:173);
-      doc.text(txt.toUpperCase(), M+4, yy+1);
+      doc.setTextColor(200, 170, 80);
+      doc.text(txt.toUpperCase(), M+5, yy+4.8);
       return yy + 10;
     }
 
-    // KPI grande con sfondo e bordo colorato
-    function bigKPI(label, value, subval, x, yy, w, h, rc,gc,bc, textcol) {
-      // Sfondo
-      doc.setFillColor(18, 21, 30);
-      doc.roundedRect(x, yy, w, h, 2.5, 2.5, 'F');
-      // Bordo colorato in alto
-      doc.setFillColor(rc,gc,bc);
-      doc.roundedRect(x, yy, w, 1.5, 0.5, 0.5, 'F');
-      // Label
-      doc.setFontSize(6); doc.setFont('helvetica','normal');
-      doc.setTextColor(100,107,120);
-      doc.text(label.toUpperCase(), x+4, yy+6);
-      // Valore principale
-      doc.setFontSize(13); doc.setFont('helvetica','bold');
-      doc.setTextColor(textcol[0], textcol[1], textcol[2]);
-      doc.text(value, x+4, yy+14);
-      // Sub valore
-      if (subval) {
-        doc.setFontSize(7); doc.setFont('helvetica','normal');
-        doc.setTextColor(100,107,120);
-        doc.text(subval, x+4, yy+20);
+    // KPI card: label in alto, valore grande, sub piccolo
+    function kpiCard(label, value, sub, x, yy, w, h, borderR, borderG, borderB, valR, valG, valB) {
+      doc.setFillColor(18, 21, 32);
+      doc.roundedRect(x, yy, w, h, 1.5, 1.5, 'F');
+      // bordo colorato superiore
+      doc.setFillColor(borderR, borderG, borderB);
+      doc.rect(x, yy, w, 1.2, 'F');
+      // label
+      doc.setFontSize(5.5); doc.setFont('helvetica','normal'); doc.setTextColor(90,97,110);
+      doc.text(label.toUpperCase(), x+3, yy+5.5);
+      // valore
+      doc.setFontSize(12); doc.setFont('helvetica','bold');
+      doc.setTextColor(valR, valG, valB);
+      doc.text(value, x+3, yy+13);
+      // sub
+      if (sub) {
+        doc.setFontSize(6); doc.setFont('helvetica','normal'); doc.setTextColor(75,82,95);
+        doc.text(sub, x+3, yy+18);
       }
     }
 
-    // Riga tabella
-    function tRow(cols, widths, yy, isHeader, isAlt) {
+    function tableRow(cols, widths, yy, isHeader, isAlt) {
       const h = 7;
-      if (isHeader) { doc.setFillColor(22,26,38); doc.rect(M, yy, W-M*2, h, 'F'); }
-      else if (isAlt) { doc.setFillColor(14,17,26); doc.rect(M, yy, W-M*2, h, 'F'); }
-      let x = M+2;
+      if (isHeader) { doc.setFillColor(20,24,36); doc.rect(M, yy, W-M*2, h, 'F'); }
+      else if (isAlt) { doc.setFillColor(13,16,24); doc.rect(M, yy, W-M*2, h, 'F'); }
+      let x = M + 2;
       cols.forEach((col, i) => {
         const txt   = typeof col === 'object' ? col.text  : col;
         const align = typeof col === 'object' ? (col.align||'left') : 'left';
         const color = typeof col === 'object' ? col.color : null;
         if (isHeader) {
-          doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(90,97,110);
+          doc.setFontSize(6); doc.setFont('helvetica','bold'); doc.setTextColor(80,87,100);
         } else {
-          doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(210,215,225);
+          doc.setFontSize(8); doc.setFont('helvetica','normal');
           if (color === 'gold')     doc.setTextColor(232,184,75);
           else if (color === 'grn') doc.setTextColor(61,214,140);
           else if (color === 'red') doc.setTextColor(232,75,75);
-          else if (color === 'blu') doc.setTextColor(75,157,232);
-          else if (color === 'dim') doc.setTextColor(100,107,120);
+          else if (color === 'dim') doc.setTextColor(80,87,100);
+          else                      doc.setTextColor(200,208,220);
         }
-        const xPos = align==='right' ? x+widths[i]-3 : x+1;
-        doc.text(String(txt||''), xPos, yy+4.8, {align});
+        const xPos = align === 'right' ? x + widths[i] - 2 : x + 1;
+        doc.text(String(txt||''), xPos, yy + 4.8, {align});
         x += widths[i];
       });
-      doc.setDrawColor(20,24,35); doc.setLineWidth(0.1);
+      doc.setDrawColor(18,22,34); doc.setLineWidth(0.1);
       doc.line(M, yy+h, W-M, yy+h);
-      return yy+h;
+      return yy + h;
     }
 
-    // Barra orizzontale proporzionale
-    function miniBar(val, maxVal, x, yy, bw, bh, rc,gc,bc) {
-      doc.setFillColor(22,26,38);
-      doc.roundedRect(x, yy, bw, bh, 0.8, 0.8, 'F');
+    function miniBar(val, maxVal, x, yy, bw, bh, r, g, b) {
+      doc.setFillColor(20,24,36);
+      doc.roundedRect(x, yy, bw, bh, 0.5, 0.5, 'F');
       const fill = maxVal > 0 ? Math.min(1, val/maxVal) : 0;
-      if (fill > 0) {
-        doc.setFillColor(rc,gc,bc);
-        doc.roundedRect(x, yy, Math.max(1.5, bw*fill), bh, 0.8, 0.8, 'F');
+      if (fill > 0.01) {
+        doc.setFillColor(r, g, b);
+        doc.roundedRect(x, yy, Math.max(1, bw*fill), bh, 0.5, 0.5, 'F');
       }
     }
 
-    // ════════════════════════════════════════════════════════════
-    // PAGINA 1
-    // ════════════════════════════════════════════════════════════
-    bgPage(); pageHeader();
-    y = 18;
+    // ══════════════════════════════════════════════════════════════
+    // INIZIO DOCUMENTO
+    // ══════════════════════════════════════════════════════════════
+    drawBg(); drawFooter();
 
-    // ── TITOLO ───────────────────────────────────────────────────
-    doc.setFontSize(22); doc.setFont('helvetica','bold');
+    // Header striscia
+    doc.setFillColor(16, 20, 30);
+    doc.rect(0, 0, W, 13, 'F');
+    doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,82,95);
+    doc.text('EGO DASHBOARD', M, 8.5);
+    doc.text('Generato il ' + oggi, W-M, 8.5, {align:'right'});
+
+    y = 19;
+
+    // Titolo: solo subtitle (es. "Analisi mensile"), senza la data lunga
+    doc.setFontSize(18); doc.setFont('helvetica','bold');
     doc.setTextColor(232,184,75);
-    doc.text(title, M, y);
+    doc.text(subtitle, M, y);
     y += 6;
-    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,107,120);
-    doc.text(subtitle + '   •   ' + oggi, M, y);
-    y += 3;
-    goldLine(y); y += 7;
 
-    // ── SEZIONE 1: INCASSI ───────────────────────────────────────
-    y = sectionHeader('📊 Incassi', y, 30, 40, 65);
+    // Linea dorata
+    doc.setDrawColor(232,184,75); doc.setLineWidth(0.3);
+    doc.line(M, y, W-M, y);
+    y += 8;
 
-    // 4 KPI grandi su una riga
-    const kW = (W - M*2 - 6) / 4;
-    const kH = 24;
+    // ── SEZIONE 1: INCASSI ────────────────────────────────────────
+    y = sectionTitle('Incassi', y);
 
-    bigKPI('Incasso Lordo', euro(totLordo), 'IVA al 10% inclusa',
-      M, y, kW, kH, 232,184,75, [232,184,75]);
-    bigKPI('Incasso Netto', euro(totImponibile), 'Al netto IVA',
-      M + kW+2, y, kW, kH, 75,157,232, [75,157,232]);
-    bigKPI('Margine', euro(totMargine), pct(marginePerc) + ' sul netto',
-      M + (kW+2)*2, y, kW, kH, 61,214,140, [61,214,140]);
-    bigKPI('Marg. Effettivo', euro(margEff), costiGiorno>0 ? 'Dopo costi fissi' : 'Nessun costo fisso',
-      M + (kW+2)*3, y, kW, kH,
+    const kW = (W - M*2 - 9) / 3;
+    const kH = 22;
+    const gap = 4.5;
+
+    kpiCard('Incasso Lordo', euro(totLordo), 'IVA al 10% inclusa',
+      M, y, kW, kH, 232,184,75, 232,184,75);
+    kpiCard('Incasso Netto', euro(totImponibile), 'Al netto IVA',
+      M + kW+gap, y, kW, kH, 75,157,232, 75,157,232);
+    kpiCard('Margine Effettivo', euro(margEff), 'Dopo costi fissi (' + euro(costiGiorno) + ')',
+      M + (kW+gap)*2, y, kW, kH,
       margEff>=0?61:232, margEff>=0?214:75, margEff>=0?140:75,
-      margEff>=0?[61,214,140]:[232,75,75]);
-    y += kH + 6;
+      margEff>=0?61:232, margEff>=0?214:75, margEff>=0?140:75);
+    y += kH + 8;
 
-    // ── SEZIONE 2: BREAK EVEN ────────────────────────────────────
-    y = sectionHeader('🎯 Break Even', y, 50, 30, 70);
+    // ── SEZIONE 2: BREAK EVEN ─────────────────────────────────────
+    y = sectionTitle('Break Even', y);
 
     if (bep > 0) {
-      // 2 KPI affiancati
-      const bW = (W - M*2 - 4) / 2;
-      bigKPI('Break Even Netto', euro(bep), 'Imponibile necessario per coprire i costi',
-        M, y, bW, kH, 160,75,232, [160,75,232]);
-      bigKPI('Break Even Lordo', euro(bepLordo), 'IVA inclusa — quello che vedi in cassa',
-        M + bW+4, y, bW, kH, 224,75,232, [224,100,232]);
+      const bW = (W - M*2 - gap) / 2;
+      kpiCard('Break Even Netto', euro(bep), 'Imponibile minimo per coprire i costi',
+        M, y, bW, kH, 160,75,232, 160,75,232);
+      kpiCard('Break Even Lordo', euro(bepLordo), 'IVA inclusa',
+        M + bW+gap, y, bW, kH, 200,75,220, 200,75,220);
       y += kH + 5;
 
-      // Barra progresso BEP
-      const fillBEP = Math.min(1, totLordo / bepLordo);
+      // Barra BEP
       const bw = W - M*2;
-      doc.setFillColor(18,21,30); doc.roundedRect(M, y, bw, 8, 2, 2, 'F');
-      const barColor = fillBEP>=1 ? [61,214,140] : fillBEP>0.7 ? [232,184,75] : [232,75,75];
-      doc.setFillColor(...barColor);
-      doc.roundedRect(M, y, Math.max(3, bw*fillBEP), 8, 2, 2, 'F');
-      // Testo dentro barra
-      doc.setFontSize(6.5); doc.setFont('helvetica','bold'); doc.setTextColor(...barColor);
-      const bepLabel = (fillBEP*100).toFixed(0) + '%  —  ' + euro(totLordo) + ' / ' + euro(bepLordo);
-      doc.setTextColor(fillBEP >= 0.5 ? 9 : barColor[0], fillBEP>=0.5 ? 11 : barColor[1], fillBEP>=0.5 ? 16 : barColor[2]);
-      doc.text(bepLabel, M + bw/2, y+5.5, {align:'center'});
-      y += 13;
+      const fillBEP = Math.min(1, totLordo / bepLordo);
+      const barR = fillBEP>=1 ? 61  : fillBEP>0.7 ? 232 : 232;
+      const barG = fillBEP>=1 ? 214 : fillBEP>0.7 ? 184 : 75;
+      const barB = fillBEP>=1 ? 140 : fillBEP>0.7 ? 75  : 75;
+      doc.setFillColor(20,24,36); doc.roundedRect(M, y, bw, 7, 1.5, 1.5, 'F');
+      doc.setFillColor(barR,barG,barB);
+      doc.roundedRect(M, y, Math.max(2, bw*fillBEP), 7, 1.5, 1.5, 'F');
+      doc.setFontSize(6); doc.setFont('helvetica','bold');
+      doc.setTextColor(fillBEP>0.5 ? 9:barR, fillBEP>0.5 ? 11:barG, fillBEP>0.5 ? 16:barB);
+      doc.text((fillBEP*100).toFixed(0)+'%   '+euro(totLordo)+' / '+euro(bepLordo), M+bw/2, y+4.8, {align:'center'});
+      y += 10;
 
-      // Info costi
-      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(90,97,110);
-      doc.text('Costi fissi: ' + euro(costiGiorno) + '   |   Margine %: ' + pct(marginePerc) + '   |   ' + (fillBEP>=1 ? '✓ Break even raggiunto' : 'Mancano ' + euro(bepLordo - totLordo) + ' al break even'), M, y);
-      y += 8;
+      doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,82,95);
+      const bepTxt = fillBEP >= 1
+        ? 'Break even raggiunto  |  Surplus: ' + euro(totLordo - bepLordo)
+        : 'Mancano ' + euro(bepLordo - totLordo) + ' al break even  |  Costi fissi: ' + euro(costiGiorno) + '  |  Margine medio: ' + pct(marginePerc);
+      doc.text(bepTxt, M, y);
+      y += 9;
     } else {
-      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(90,97,110);
-      doc.text('Nessun costo fisso impostato — carica un file con il foglio COSTI per calcolare il break even.', M, y+5);
+      doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(75,82,95);
+      doc.text('Nessun costo fisso impostato — carica un file con il foglio COSTI per calcolare il break even.', M, y+6);
       y += 14;
     }
 
-    // ── SEZIONE 3: TOP 5 CATEGORIE ───────────────────────────────
-    y = sectionHeader('🏆 Top 5 Categorie più Vendute', y, 30, 55, 40);
+    // ── SEZIONE 3: TOP 5 CATEGORIE ────────────────────────────────
+    y = sectionTitle('Top 5 Categorie piu Vendute', y);
 
     if (top5cat.length) {
-      const maxQty = top5cat[0][1].qty;
-      const medals = ['🥇','🥈','🥉','4','5'];
-      const colW = [8, 55, 28, 35, 38, 14];
-
-      y = tRow(['', 'Categoria', {text:'Qtà',align:'right'}, {text:'Incasso',align:'right'}, {text:'Margine',align:'right'}, {text:'M%',align:'right'}], colW, y, true);
-
+      const maxQ = top5cat[0][1].qty;
+      const cW = [10, 62, 24, 32, 32, 18];
+      y = tableRow(['', 'Categoria', {text:'Qta',align:'right'}, {text:'Incasso',align:'right'}, {text:'Margine',align:'right'}, {text:'M%',align:'right'}], cW, y, true);
       top5cat.forEach(([cat, v], i) => {
-        checkY(14);
+        checkY(10);
         const mp = v.incasso > 0 ? v.margine/v.incasso*100 : 0;
-        const nome = cat.replace(/--/g,'').trim();
-        // Riga dati
-        y = tRow([
-          medals[i],
-          nome,
-          {text: Math.round(v.qty)+' pz', align:'right', color:'gold'},
-          {text: euro(v.incasso), align:'right'},
-          {text: euro(v.margine), align:'right', color: v.margine>=0?'grn':'red'},
-          {text: pct(mp), align:'right', color: mp>=40?'grn':mp>=20?'gold':'red'},
-        ], colW, y, false, i%2===1);
-        // Mini barra proporzionale sotto la riga
-        miniBar(v.qty, maxQty, M+64, y-3.5, 50, 2, 61,214,140);
-        y += 2;
+        y = tableRow([
+          {text:medals[i], color:'dim'},
+          cat.replace(/--/g,'').trim(),
+          {text:Math.round(v.qty)+' pz', align:'right', color:'gold'},
+          {text:euro(v.incasso), align:'right'},
+          {text:euro(v.margine), align:'right', color:v.margine>=0?'grn':'red'},
+          {text:pct(mp), align:'right', color:mp>=40?'grn':mp>=20?'gold':'red'},
+        ], cW, y, false, i%2===1);
+        miniBar(v.qty, maxQ, M+73, y-2.5, 45, 1.8, 61,214,140);
       });
-      y += 4;
+      y += 6;
     }
 
-    // ── SEZIONE 4: TOP 5 PRODOTTI ────────────────────────────────
-    checkY(60);
-    y = sectionHeader('⭐ Top 5 Prodotti più Venduti', y, 40, 45, 20);
+    // ── SEZIONE 4: TOP 5 PRODOTTI ─────────────────────────────────
+    checkY(50);
+    y = sectionTitle('Top 5 Prodotti piu Venduti', y);
 
     if (top5prod.length) {
-      const maxQtyP = top5prod[0][1].qty;
-      const medals = ['🥇','🥈','🥉','4','5'];
-      const colW2 = [8, 72, 22, 35, 35, 6];
-
-      y = tRow(['', 'Prodotto', {text:'Qtà',align:'right'}, {text:'Incasso',align:'right'}, {text:'Margine',align:'right'}, ''], colW2, y, true);
-
+      const maxQ = top5prod[0][1].qty;
+      const pW = [10, 78, 24, 32, 32, 2];
+      y = tableRow(['', 'Prodotto', {text:'Qta',align:'right'}, {text:'Incasso',align:'right'}, {text:'Margine',align:'right'}, ''], pW, y, true);
       top5prod.forEach(([prod, v], i) => {
-        checkY(14);
-        const mp = v.incasso > 0 ? v.margine/v.incasso*100 : 0;
-        y = tRow([
-          medals[i],
-          prod.substring(0, 28),
-          {text: Math.round(v.qty)+' pz', align:'right', color:'gold'},
-          {text: euro(v.incasso), align:'right'},
-          {text: euro(v.margine), align:'right', color: v.margine>=0?'grn':'red'},
+        checkY(10);
+        y = tableRow([
+          {text:medals[i], color:'dim'},
+          prod.substring(0,30),
+          {text:Math.round(v.qty)+' pz', align:'right', color:'gold'},
+          {text:euro(v.incasso), align:'right'},
+          {text:euro(v.margine), align:'right', color:v.margine>=0?'grn':'red'},
           '',
-        ], colW2, y, false, i%2===1);
-        miniBar(v.qty, maxQtyP, M+81, y-3.5, 42, 2, 232,184,75);
-        y += 2;
+        ], pW, y, false, i%2===1);
+        miniBar(v.qty, maxQ, M+89, y-2.5, 40, 1.8, 232,184,75);
       });
     }
 
-    // ── FOOTER ───────────────────────────────────────────────────
+    // Aggiorna footer con numero pagine corretto
     const totalPages = doc.getNumberOfPages();
     for (let p=1; p<=totalPages; p++) {
       doc.setPage(p);
       doc.setFillColor(14,17,24);
       doc.rect(0, 287, W, 10, 'F');
       doc.setFontSize(6); doc.setFont('helvetica','normal'); doc.setTextColor(60,67,80);
-      doc.text('EGO Dashboard — Documento riservato — ' + oggi, M, 293);
+      doc.text('EGO Dashboard  —  Documento riservato  —  ' + oggi, M, 293);
       doc.text('Pag. ' + p + ' / ' + totalPages, W-M, 293, {align:'right'});
     }
 
-    const filename = 'report-' + title.replace(/[^a-z0-9]/gi,'-').toLowerCase() + '-' + oggi.replace(/\//g,'-') + '.pdf';
+    const filename = 'report-ego-' + oggi.replace(/\//g,'-') + '.pdf';
     doc.save(filename);
 
   } catch(e) {
