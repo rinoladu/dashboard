@@ -2593,11 +2593,9 @@ async function esportaPDF() {
     y = sectionTitle('Break Even', y);
 
     if (bep > 0) {
-      const bW = (W - M*2 - gap) / 2;
-      kpiCard('Break Even Netto', euro(bep), 'Imponibile minimo per coprire i costi',
-        M, y, bW, kH, 160,75,232, 160,75,232);
-      kpiCard('Break Even Lordo', euro(bepLordo), 'IVA inclusa',
-        M + bW+gap, y, bW, kH, 200,75,220, 200,75,220);
+      const bW = W - M*2;
+      kpiCard('Break Even Lordo', euro(bepLordo), 'IVA inclusa — quello che vedi in cassa',
+        M, y, bW, kH, 200,75,220, 200,75,220);
       y += kH + 5;
 
       // Barra BEP
@@ -2631,20 +2629,18 @@ async function esportaPDF() {
 
     if (top5cat.length) {
       const maxQ = top5cat[0][1].qty;
-      const cW = [10, 62, 24, 32, 32, 18];
-      y = tableRow(['', 'Categoria', {text:'Qta',align:'right'}, {text:'Incasso',align:'right'}, {text:'Margine',align:'right'}, {text:'M%',align:'right'}], cW, y, true);
+      const cW = [10, 90, 30, 48, 0];
+      y = tableRow(['', 'Categoria', {text:'Qta',align:'right'}, {text:'Incasso',align:'right'}, ''], cW, y, true);
       top5cat.forEach(([cat, v], i) => {
         checkY(10);
-        const mp = v.incasso > 0 ? v.margine/v.incasso*100 : 0;
         y = tableRow([
           {text:medals[i], color:'dim'},
           cat.replace(/--/g,'').trim(),
           {text:Math.round(v.qty)+' pz', align:'right', color:'gold'},
           {text:euro(v.incasso), align:'right'},
-          {text:euro(v.margine), align:'right', color:v.margine>=0?'grn':'red'},
-          {text:pct(mp), align:'right', color:mp>=40?'grn':mp>=20?'gold':'red'},
+          '',
         ], cW, y, false, i%2===1);
-        miniBar(v.qty, maxQ, M+73, y-2.5, 45, 1.8, 61,214,140);
+        miniBar(v.qty, maxQ, M+105, y-2.5, 62, 1.8, 61,214,140);
       });
       y += 6;
     }
@@ -2655,19 +2651,18 @@ async function esportaPDF() {
 
     if (top5prod.length) {
       const maxQ = top5prod[0][1].qty;
-      const pW = [10, 78, 24, 32, 32, 2];
-      y = tableRow(['', 'Prodotto', {text:'Qta',align:'right'}, {text:'Incasso',align:'right'}, {text:'Margine',align:'right'}, ''], pW, y, true);
+      const pW = [10, 90, 30, 48, 0];
+      y = tableRow(['', 'Prodotto', {text:'Qta',align:'right'}, {text:'Incasso',align:'right'}, ''], pW, y, true);
       top5prod.forEach(([prod, v], i) => {
         checkY(10);
         y = tableRow([
           {text:medals[i], color:'dim'},
-          prod.substring(0,30),
+          prod.substring(0,34),
           {text:Math.round(v.qty)+' pz', align:'right', color:'gold'},
           {text:euro(v.incasso), align:'right'},
-          {text:euro(v.margine), align:'right', color:v.margine>=0?'grn':'red'},
           '',
         ], pW, y, false, i%2===1);
-        miniBar(v.qty, maxQ, M+89, y-2.5, 40, 1.8, 232,184,75);
+        miniBar(v.qty, maxQ, M+105, y-2.5, 62, 1.8, 232,184,75);
       });
     }
 
