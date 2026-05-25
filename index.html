@@ -2954,21 +2954,27 @@ function generaPrevisioni() {
   const mediaFine = valori.slice(-primiN).reduce((s,v)=>s+v,0) / primiN;
   const trendDirezione = mediaFine - mediaInizio; // positivo = crescita
 
-  // ── Regressione lineare semplice per proiezione pesata ─────────
+  // ── Proiezione basata su media giornaliera reale ─────────────
+  const ratioChiusure = n / Math.max(1, giornoOggi);
+  const chiusurePreviste = Math.round(giorniRimasti * ratioChiusure);
+  // Base: media globale del mese (robusta, ignora spike)
+  const proiezioneLineare = totaleFinora + mediaGiornaliera * chiusurePreviste;
+  // Regressione lineare — cappata a +/-15% rispetto alla media semplice
   let sumX=0, sumY=0, sumXY=0, sumX2=0;
   valori.forEach((v,i) => { sumX+=i; sumY+=v; sumXY+=i*v; sumX2+=i*i; });
   const slope = n > 1 ? (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX) : 0;
   const intercept = (sumY - slope*sumX) / n;
-  // Proiezione: media pesata tra lineare e regressione
-  const chiusurePreviste = Math.round(giorniRimasti * n / Math.max(1, giornoOggi));
-  const ultimoIdx = n - 1;
   let proiezioneTrend = totaleFinora;
   for (let i = 1; i <= chiusurePreviste; i++) {
-    proiezioneTrend += Math.max(0, intercept + slope * (ultimoIdx + i));
+    proiezioneTrend += Math.max(0, intercept + slope * (n - 1 + i));
   }
-  const proiezioneLineare = totaleFinora + mediaGiornaliera * chiusurePreviste;
-  // Blend: 60% trend, 40% lineare
-  const proiezione = proiezioneTrend * 0.6 + proiezioneLineare * 0.4;
+  const maxScarto = proiezioneLineare * 0.15;
+  const proiezioneTrendCappata = Math.max(
+    proiezioneLineare - maxScarto,
+    Math.min(proiezioneLineare + maxScarto, proiezioneTrend)
+  );
+  // Blend: 70% media semplice + 30% trend cappato
+  const proiezione = proiezioneLineare * 0.7 + proiezioneTrendCappata * 0.3;
 
   // ── Variabilità (deviazione standard) ──────────────────────────
   const media = totaleFinora / n;
