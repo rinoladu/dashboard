@@ -1841,8 +1841,18 @@ function apriAnalisi() {
   const totCopertiAgg = tuttiCoperti.reduce((s,r) => s + (r.qty||0), 0);
   const chiusuraAgg = giorni.flatMap(g => g.chiusura.filter(r => !(r.cat==='--CLIENTE--' && r.prodotto && r.prodotto.toUpperCase().includes('COPERTO'))));
   if (totCopertiAgg > 0) chiusuraAgg.push({ cat:'--CLIENTE--', prodotto:'COPERTO', qty: totCopertiAgg, totale:0, imponibile:0, costoUnit:0, costoTot:0, margineEuro:0, marginePerc:0 });
-  const totLordoAgg = giorni.reduce((s,g) => s + (g.totLordo||(g.totImponibile||0)*1.10), 0);
-  const merged = { chiusura: chiusuraAgg, foodDrinkCost: giorni[0].foodDrinkCost, costiGiorn: giorni[0].costiGiorn*n, totLordo: totLordoAgg };
+  const totLordoAgg   = giorni.reduce((s,g) => s + (g.totLordo||(g.totImponibile||0)*1.10), 0);
+  const totMargineAgg = giorni.reduce((s,g) => s + (g.totMargine||0), 0);
+  const totCostiAgg   = giorni.reduce((s,g) => s + (g.costiGiorn||0), 0);
+  const margEffAgg    = totMargineAgg - totCostiAgg;
+  const merged = {
+    chiusura: chiusuraAgg,
+    foodDrinkCost: giorni[0].foodDrinkCost,
+    costiGiorn: totCostiAgg,
+    totLordo: totLordoAgg,
+    totMargine: totMargineAgg,
+    margEff: margEffAgg
+  };
   const tipo = n===1?'giorno':n<=7?'settimana':'mese';
   const label = n===1?formatDate(giorni[0].data):`${formatDate(giorni[n-1].data)} → ${formatDate(giorni[0].data)} (${n} giorni)`;
   apriDashboard(merged, label, tipo);
@@ -2158,14 +2168,14 @@ function openModalDyn(tipo, cat, label) {
 function buildUI() {
   const d=CURRENT_DATA;
   const totImponibile=d.chiusura.reduce((s,r)=>s+r.imponibile,0);
-  // Usa totLordo salvato se disponibile (es. analisi aggregata), altrimenti calcola
-  const totLordo=d.totLordo || totImponibile*1.10;
-  const totMargine=d.chiusura.reduce((s,r)=>s+r.margineEuro,0);
-  const marginePerc=totImponibile>0?(totMargine/totImponibile*100):0;
-  const costiGiorno=d.costiGiorn||0;
-  const percMargine=totImponibile>0?totMargine/totImponibile:0;
-  const bep=percMargine>0?totImponibile+(costiGiorno-totMargine)/percMargine:0;
-  const margEff=totMargine-costiGiorno;
+  // Usa valori pre-calcolati se disponibili (analisi aggregata), altrimenti ricalcola
+  const totLordo   = d.totLordo    || totImponibile*1.10;
+  const totMargine = d.totMargine  || d.chiusura.reduce((s,r)=>s+r.margineEuro,0);
+  const costiGiorno= d.costiGiorn  || 0;
+  const margEff    = d.margEff     !== undefined ? d.margEff : totMargine - costiGiorno;
+  const marginePerc= totImponibile>0?(totMargine/totImponibile*100):0;
+  const percMargine= totImponibile>0?totMargine/totImponibile:0;
+  const bep        = percMargine>0?totImponibile+(costiGiorno-totMargine)/percMargine:0;
   // Coperti
   // Somma tutti i prodotti "COPERTO" nelle categorie --CLIENTE-- e --COPERTI--
   const copertiRows=d.chiusura.filter(r=>{
