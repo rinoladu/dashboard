@@ -2158,7 +2158,8 @@ function openModalDyn(tipo, cat, label) {
 function buildUI() {
   const d=CURRENT_DATA;
   const totImponibile=d.chiusura.reduce((s,r)=>s+r.imponibile,0);
-  const totLordo=totImponibile*1.10;
+  // Usa totLordo salvato se disponibile (es. analisi aggregata), altrimenti calcola
+  const totLordo=d.totLordo || totImponibile*1.10;
   const totMargine=d.chiusura.reduce((s,r)=>s+r.margineEuro,0);
   const marginePerc=totImponibile>0?(totMargine/totImponibile*100):0;
   const costiGiorno=d.costiGiorn||0;
