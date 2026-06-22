@@ -962,7 +962,7 @@ body.light .emoji-btn { background: #e8eaed; }
 </div>
 
   <!-- TAB FOOD COST -->
-  <div id="panel-foodcost" style="display:none">
+  <div id="panel-foodcost" style="display:none;min-height:0">
     <div class="fc-toolbar">
       <input class="fc-search" type="text" id="fc-search" placeholder="🔍 Cerca prodotto o categoria..." oninput="renderFoodCostTable()">
       <div style="display:flex;gap:0.4rem;flex-wrap:wrap">
@@ -973,7 +973,7 @@ body.light .emoji-btn { background: #e8eaed; }
       </div>
     </div>
     <div class="fc-stats" id="fc-stats"></div>
-    <div class="fc-table-wrap">
+    <div class="fc-table-wrap" style="min-height:0">
       <table class="fc-table">
         <thead>
           <tr>
@@ -986,9 +986,12 @@ body.light .emoji-btn { background: #e8eaed; }
         </thead>
         <tbody id="fc-tbody"></tbody>
       </table>
-      <div id="fc-empty" class="fc-empty" style="display:none">
-        Nessun prodotto trovato.<br><br>
-        Importa un file Excel con il foglio FOOD-DRINK COST per iniziare.
+      <div id="fc-empty" class="fc-empty" style="display:none;padding:2rem 1rem">
+        <div style="font-size:2rem;margin-bottom:0.8rem">📋</div>
+        <div style="font-size:1rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--text2);margin-bottom:0.5rem">Nessun food cost caricato</div>
+        <div style="font-size:0.8rem;color:var(--text3);max-width:300px;margin:0 auto;line-height:1.5">
+          Premi <strong style="color:var(--accent2)">Importa da Excel</strong> e carica un file di chiusura — il software legge automaticamente il foglio FOOD-DRINK COST.
+        </div>
       </div>
     </div>
   </div>
@@ -1752,7 +1755,15 @@ function switchTab(tab) {
   document.getElementById('tab-analisi').className = 'tab' + (tab === 'analisi' ? ' active' : '');
   document.getElementById('tab-foodcost').className = 'tab' + (tab === 'foodcost' ? ' active' : '');
   if (tab === 'analisi') renderGiorniListAnalisi();
-  if (tab === 'foodcost') renderFoodCostTable();
+  if (tab === 'foodcost') {
+    renderFoodCostTable();
+    // Se vuoto, mostra subito empty state
+    const items = Object.keys(FOOD_COST_CENTRALE);
+    if (!items.length) {
+      document.getElementById('fc-empty').style.display = 'block';
+      document.getElementById('fc-tbody').innerHTML = '';
+    }
+  }
 }
 
 // ===== RENDER LISTE =====
