@@ -150,6 +150,7 @@ body {
 
 /* ===== HOME ===== */
 #home-screen { display: none; flex-direction: column; min-height: 100vh; }
+#home-screen > div[id^="panel-"] { flex-shrink: 0; }
 .home-header {
   background: rgba(7,9,12,0.9);
   border-bottom: 1px solid var(--border);
@@ -388,7 +389,7 @@ body {
 .fc-stats { display:flex; gap:1rem; padding:0 1rem 0.6rem; flex-wrap:wrap; }
 .fc-stat { font-size:0.7rem; color:var(--text3); font-family:'Barlow Condensed',sans-serif; }
 .fc-stat span { color:var(--accent); font-weight:700; }
-.fc-table-wrap { padding:0 1rem 1rem; overflow-x:auto; }
+.fc-table-wrap { padding:0 1rem 1rem; overflow-x:auto; min-height:0; }
 .fc-table { width:100%; border-collapse:collapse; font-size:0.8rem; }
 .fc-table th { background:var(--surface2); color:var(--text3); font-family:'Barlow Condensed',sans-serif; font-size:0.68rem; letter-spacing:0.1em; text-transform:uppercase; padding:0.5rem 0.6rem; text-align:left; position:sticky; top:0; z-index:1; }
 .fc-table th.num { text-align:right; }
@@ -402,6 +403,10 @@ body {
 .fc-input.no-value { color:var(--text3); }
 .fc-badge-changed { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--accent); margin-left:4px; vertical-align:middle; }
 .fc-empty { text-align:center; padding:3rem; color:var(--text3); font-size:0.85rem; }
+#panel-foodcost { background:var(--bg); display:flex; flex-direction:column; }
+#panel-foodcost .fc-toolbar { order:0; }
+#panel-foodcost .fc-stats { order:1; }
+#panel-foodcost .fc-table-wrap { order:2; flex:0 0 auto; }
 .fc-save-bar { position:sticky; bottom:0; background:var(--surface); border-top:1px solid var(--border); padding:0.8rem 1rem; display:none; align-items:center; justify-content:space-between; gap:1rem; z-index:10; }
 .fc-save-bar.visible { display:flex; }
 .fc-save-info { font-size:0.75rem; color:var(--accent); font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:0.06em; }
@@ -963,7 +968,7 @@ body.light .emoji-btn { background: #e8eaed; }
 
   <!-- TAB FOOD COST -->
   <div id="panel-foodcost" style="display:none">
-    <div class="fc-toolbar">
+    <div class="fc-toolbar" style="margin-top:0.5rem">
       <input class="fc-search" type="text" id="fc-search" placeholder="🔍 Cerca prodotto o categoria..." oninput="renderFoodCostTable()">
       <div style="display:flex;gap:0.4rem;flex-wrap:wrap">
         <button class="btn-fc blue" onclick="document.getElementById('fc-import-input').click()">📥 Importa da Excel</button>
@@ -3623,7 +3628,10 @@ async function caricaFoodCostCentrale() {
 }
 
 async function salvaFoodCost() {
-  if (!Object.keys(fcModifiche).length) return;
+  if (!Object.keys(FOOD_COST_CENTRALE).length) {
+    alert('Nessun prodotto da salvare. Importa prima un file Excel.');
+    return;
+  }
   const btn = document.getElementById('btn-fc-save');
   btn.textContent = '⏳ Salvataggio...';
   btn.disabled = true;
