@@ -962,7 +962,7 @@ body.light .emoji-btn { background: #e8eaed; }
 </div>
 
   <!-- TAB FOOD COST -->
-  <div id="panel-foodcost" style="display:none;min-height:0">
+  <div id="panel-foodcost" style="display:none">
     <div class="fc-toolbar">
       <input class="fc-search" type="text" id="fc-search" placeholder="🔍 Cerca prodotto o categoria..." oninput="renderFoodCostTable()">
       <div style="display:flex;gap:0.4rem;flex-wrap:wrap">
@@ -986,7 +986,7 @@ body.light .emoji-btn { background: #e8eaed; }
         </thead>
         <tbody id="fc-tbody"></tbody>
       </table>
-      <div id="fc-empty" class="fc-empty" style="display:none;padding:2rem 1rem">
+      <div id="fc-empty" class="fc-empty" style="padding:2rem 1rem">
         <div style="font-size:2rem;margin-bottom:0.8rem">📋</div>
         <div style="font-size:1rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--text2);margin-bottom:0.5rem">Nessun food cost caricato</div>
         <div style="font-size:0.8rem;color:var(--text3);max-width:300px;margin:0 auto;line-height:1.5">
@@ -1756,13 +1756,16 @@ function switchTab(tab) {
   document.getElementById('tab-foodcost').className = 'tab' + (tab === 'foodcost' ? ' active' : '');
   if (tab === 'analisi') renderGiorniListAnalisi();
   if (tab === 'foodcost') {
-    renderFoodCostTable();
-    // Se vuoto, mostra subito empty state
-    const items = Object.keys(FOOD_COST_CENTRALE);
-    if (!items.length) {
-      document.getElementById('fc-empty').style.display = 'block';
-      document.getElementById('fc-tbody').innerHTML = '';
+    // Mostra subito empty state, poi renderizza (caricaFoodCostCentrale è async)
+    const fcEmpty = document.getElementById('fc-empty');
+    const fcTbody = document.getElementById('fc-tbody');
+    if (fcEmpty && fcTbody) {
+      if (!Object.keys(FOOD_COST_CENTRALE).length) {
+        fcEmpty.style.display = 'block';
+        fcTbody.innerHTML = '';
+      }
     }
+    renderFoodCostTable();
   }
 }
 
@@ -3745,11 +3748,10 @@ function renderFoodCostTable() {
   if (!items.length) {
     tbody.innerHTML = '';
     emptyEl.style.display = 'block';
-    statsEl.innerHTML = '';
+    if (statsEl) statsEl.innerHTML = '';
     return;
   }
   emptyEl.style.display = 'none';
-
   // Stats
   const conCosto = items.filter(([,v]) => v.costoUnit > 0).length;
   const senzaCosto = items.length - conCosto;
