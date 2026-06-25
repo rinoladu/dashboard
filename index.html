@@ -1476,10 +1476,10 @@ function subscribeToData(localeId) {
   window.currentLocaleId = localeId;
   // Reset cache previsioni al cambio locale
   if (typeof previsioniCache !== 'undefined') previsioniCache = {};
-  // Reset food cost (verrà ricaricato da Firestore per il nuovo locale)
-  FOOD_COST_CENTRALE = {};
+  // Reset food cost al cambio locale
+  FC = {};
   fcModifiche = {};
-  if (typeof fcLocaleCaricato !== 'undefined') fcLocaleCaricato = null;
+  FC_locale = null;
   // Reset mese widget al corrente
   obiettivoMeseSelezionato = new Date().getMonth();
   obiettivoAnnoSelezionato = new Date().getFullYear();
@@ -1492,8 +1492,8 @@ function subscribeToData(localeId) {
     document.getElementById('loading-screen').style.display = 'none';
     document.getElementById('home-screen').style.display = 'flex';
     setSyncStatus('synced', 'Sincronizzato');
-    // Carica food cost centrale per questo locale
-    caricaFoodCostCentrale();
+    // Carica food cost per questo locale
+    fcCarica().then(() => { if (document.getElementById('panel-foodcost')?.style.display !== 'none') renderFoodCostTable(); });
     // Svuota pannello previsioni (dati nuovo locale)
     const prevBody = document.getElementById('previsioni-body');
     if (prevBody) prevBody.innerHTML = '<div style="font-size:0.75rem;color:var(--text3)">Premi “✦ Genera” per ottenere una proiezione basata sui dati di questo locale.</div>';
@@ -1799,16 +1799,12 @@ function switchTab(tab) {
   document.getElementById('tab-foodcost').className = 'tab' + (tab === 'foodcost' ? ' active' : '');
   if (tab === 'analisi') renderGiorniListAnalisi();
   if (tab === 'foodcost') {
-    const localeAttivo = window.currentLocaleId || 'default';
-    if (!Object.keys(FOOD_COST_CENTRALE).length || fcLocaleCaricato !== localeAttivo) {
-      // Locale cambiato o listino vuoto: ricarica da Firestore
-      const fcEmpty = document.getElementById('fc-empty');
+    const localeAttivo = window.currentLocaleId;
+    if (FC_locale !== localeAttivo) {
+      // Locale diverso: ricarica
       const fcTbody = document.getElementById('fc-tbody');
-      const fcStats = document.getElementById('fc-stats');
-      if (fcEmpty) fcEmpty.style.display = 'block';
       if (fcTbody) fcTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:1rem;color:var(--text3);font-size:0.75rem">Caricamento...</td></tr>';
-      if (fcStats) fcStats.innerHTML = '';
-      caricaFoodCostCentrale().then(() => renderFoodCostTable());
+      fcCarica().then(() => renderFoodCostTable());
     } else {
       renderFoodCostTable();
     }
@@ -2126,16 +2122,11 @@ function processFile(file, periodo, mese) {
       document.getElementById('loading-screen').style.display = 'none';
       document.getElementById('home-screen').style.display = 'flex';
 
-      // Aggiorna food cost centrale con i nuovi costi dal file (senza sovrascrivere manuali)
-      if (dati.foodDrinkCost && Object.keys(dati.foodDrinkCost).length > 0) {
-        aggiornaFoodCostDaChiusura(dati);
-      }
-
-      // Controlla prodotti senza costo e mostra avviso
-      const mancanti = controllaCostiMancanti(dati);
-      if (mancanti.length > 0) {
-        mostraAvvisoMancanti(mancanti);
-      }
+      // Integra food cost dal file nel listino e salva
+      await fcIntegraDaChiusura(dati);
+      // Mostra avviso prodotti ancora senza costo
+      const mancanti = fcTrovaMancanti(dati);
+      if (mancanti.length > 0) fcMostraAvvisoMancanti(mancanti);
 
       // Firestore aggiornerà la lista, apriamo la dashboard
       apriDashboard(dati, formatDate(dati.data), dati.tipo||'giorno');
@@ -2271,13 +2262,11 @@ function parseWorkbook(wb, filename, periodo, mese=null) {
       item.margineEuro = item._margine;
     } else {
       const fd = result.foodDrinkCost[k];
-      // Priorità: 1) costo dal file Excel, 2) listino centrale
-      const costoFile = fd ? fd.costoUnit : 0;
-      const costoCentrale = (typeof FOOD_COST_CENTRALE !== 'undefined' && FOOD_COST_CENTRALE[k])
-        ? FOOD_COST_CENTRALE[k].costoUnit : 0;
-      item.costoUnit = costoFile > 0 ? costoFile : costoCentrale;
-      item.costoTot = item.costoUnit * item.qty;
+      item.costoUnit = fd ? fd.costoUnit : 0;
+      item.costoTot  = item.costoUnit * item.qty;
       item.margineEuro = item.costoTot === 0 ? item.imponibile : item.imponibile - item.costoTot;
+      // Applica listino centrale se il file non ha il costo
+      if (item.costoUnit === 0) fcApplicaAItem(item);
     }
     item.marginePerc=item.imponibile>0?(item.margineEuro/item.imponibile)*100:0;
     // Pulisci campi temporanei
@@ -3558,84 +3547,136 @@ function closeObiettivoModalOutside(e) {
   if (e.target === document.getElementById('obiettivo-modal-overlay')) closeObiettivoModal();
 }
 
-// ===== FOOD COST — AVVISO MANCANTI =====
+// ===== FOOD COST =====
+// Dizionario in memoria: { codice: { prodotto, categoria, costoUnit, fonte } }
+// Separato per locale — viene caricato/salvato su Firestore sotto:
+// users/{adminUid}/locali/{localeId}/foodcost/listino
+let FC = {};          // listino attivo
+let FC_locale = null; // locale per cui è caricato
 
-function controllaCostiMancanti(dati) {
-  // Trova prodotti con imponibile > 0 ma senza costo nel listino centrale
-  const ESCLUSE = ['--CLIENTE--','--COPERTI--','SERVIZIO'];
-  const mancanti = [];
-  const visti = new Set();
+// ── Carica da Firestore ──────────────────────────────────────────
+async function fcCarica() {
+  const adminUid = localStorage.getItem('ego_admin_uid') || window._adminUid;
+  const localeId = window.currentLocaleId;
+  if (!adminUid || !localeId || !window._db) return;
+  try {
+    const { doc, getDoc } = window._firestore;
+    const snap = await getDoc(doc(window._db, 'users', adminUid, 'locali', localeId, 'foodcost', 'listino'));
+    FC = snap.exists() ? (snap.data().items || {}) : {};
+    FC_locale = localeId;
+  } catch(e) {
+    console.error('fcCarica:', e);
+    FC = {};
+  }
+}
 
+// ── Salva su Firestore ───────────────────────────────────────────
+async function fcSalva() {
+  const adminUid = localStorage.getItem('ego_admin_uid') || window._adminUid;
+  const localeId = window.currentLocaleId;
+  if (!adminUid || !localeId || !window._db) throw new Error('Sessione non valida');
+  // Sicurezza: salva solo se FC è caricato per il locale corrente
+  if (FC_locale !== localeId) {
+    console.warn('fcSalva: FC_locale=' + FC_locale + ' != localeId=' + localeId + ' — skip');
+    return;
+  }
+  const { doc, setDoc } = window._firestore;
+  await setDoc(
+    doc(window._db, 'users', adminUid, 'locali', localeId, 'foodcost', 'listino'),
+    { items: FC, aggiornato: new Date().toISOString() }
+  );
+}
+
+// ── Integra prodotti da una chiusura nel listino ─────────────────
+// Chiamato ogni volta che viene caricata una chiusura.
+// - Aggiunge prodotti nuovi
+// - Aggiorna il costo se era vuoto e ora c'è
+// - Non sovrascrive mai i costi impostati manualmente
+async function fcIntegraDaChiusura(dati) {
+  // Assicurati che FC sia caricato per il locale corrente
+  const localeAttivo = window.currentLocaleId;
+  if (FC_locale !== localeAttivo) {
+    await fcCarica();
+  }
+  let cambiato = false;
   dati.chiusura.forEach(item => {
-    const cat = (item.cat || '').toUpperCase();
-    if (ESCLUSE.some(e => cat.includes(e.replace(/--/g,'')))) return;
-    if (item.imponibile <= 0) return;
-
     const k = String(Math.round(parseFloat(item.cod)));
-    if (k === 'NaN' || visti.has(k)) return;
-    visti.add(k);
-
-    // Controlla se ha costo nel listino centrale O nel file
-    const inCentrale = FOOD_COST_CENTRALE[k] && FOOD_COST_CENTRALE[k].costoUnit > 0;
-    const inFile = item.costoUnit > 0;
-
-    if (!inCentrale && !inFile) {
-      mancanti.push({
-        cod: k,
-        prodotto: item.prodotto,
-        categoria: item.cat.replace(/--/g,'').trim(),
-        incasso: item.imponibile
-      });
+    if (!k || k === 'NaN') return;
+    const esiste = FC[k];
+    if (!esiste) {
+      // Prodotto nuovo: aggiungilo
+      FC[k] = {
+        prodotto:  item.prodotto || '',
+        categoria: item.cat || '',
+        costoUnit: item.costoUnit || 0,
+        fonte:     item.costoUnit > 0 ? 'excel' : 'mancante'
+      };
+      cambiato = true;
+    } else if (esiste.fonte !== 'manuale' && item.costoUnit > 0 && esiste.costoUnit === 0) {
+      // Aveva costo zero, ora il file ce l'ha: aggiorna
+      esiste.costoUnit = item.costoUnit;
+      esiste.fonte = 'excel';
+      cambiato = true;
     }
   });
+  if (cambiato) {
+    try { await fcSalva(); } catch(e) { console.error('fcIntegraDaChiusura save:', e); }
+  }
+  return cambiato;
+}
 
-  // Ordina per incasso decrescente (i più importanti prima)
+// ── Applica listino a una chiusura (al parsing) ──────────────────
+// Chiamato dentro parseWorkbook per usare costi dal listino
+// se il file non li ha
+function fcApplicaAItem(item) {
+  const k = String(Math.round(parseFloat(item.cod)));
+  if (!k || k === 'NaN') return;
+  if (item.costoUnit > 0) return; // il file ha già il costo
+  const fc = FC[k];
+  if (fc && fc.costoUnit > 0) {
+    item.costoUnit = fc.costoUnit;
+    item.costoTot  = fc.costoUnit * item.qty;
+    item.margineEuro = item.imponibile - item.costoTot;
+    item.marginePerc = item.imponibile > 0 ? (item.margineEuro / item.imponibile) * 100 : 0;
+  }
+}
+
+// ── Trova prodotti con incasso ma senza costo ────────────────────
+function fcTrovaMancanti(dati) {
+  const ESCLUSE = ['CLIENTE','COPERTI','SERVIZIO'];
+  const visti = new Set();
+  const mancanti = [];
+  dati.chiusura.forEach(item => {
+    const cat = (item.cat || '').toUpperCase();
+    if (ESCLUSE.some(e => cat.includes(e))) return;
+    if (item.imponibile <= 0) return;
+    const k = String(Math.round(parseFloat(item.cod)));
+    if (!k || k === 'NaN' || visti.has(k)) return;
+    visti.add(k);
+    const inFC = FC[k] && FC[k].costoUnit > 0;
+    const inFile = item.costoUnit > 0;
+    if (!inFC && !inFile) {
+      mancanti.push({ cod: k, prodotto: item.prodotto, categoria: item.cat.replace(/--/g,'').trim(), incasso: item.imponibile });
+    }
+  });
   return mancanti.sort((a,b) => b.incasso - a.incasso);
 }
 
-function aggiornaFoodCostDaChiusura(dati) {
-  // Integra nel listino centrale i prodotti dal file, senza sovrascrivere quelli già manuali
-  let nuovi = 0;
-  dati.chiusura.forEach(item => {
-    const k = String(Math.round(parseFloat(item.cod)));
-    if (k === 'NaN') return;
-    if (!FOOD_COST_CENTRALE[k]) {
-      // Prodotto nuovo: aggiungilo
-      FOOD_COST_CENTRALE[k] = {
-        prodotto: item.prodotto,
-        categoria: item.cat,
-        costoUnit: item.costoUnit || 0,
-        fonte: item.costoUnit > 0 ? 'excel' : 'excel_vuoto'
-      };
-      nuovi++;
-    } else if (FOOD_COST_CENTRALE[k].fonte !== 'manuale' && item.costoUnit > 0) {
-      // Aggiorna solo se non è manuale e il file ha un costo
-      FOOD_COST_CENTRALE[k].costoUnit = item.costoUnit;
-      FOOD_COST_CENTRALE[k].fonte = 'excel';
-    }
-  });
-}
-
-function mostraAvvisoMancanti(mancanti) {
+// ── Mostra modal mancanti ────────────────────────────────────────
+function fcMostraAvvisoMancanti(mancanti) {
   const overlay = document.getElementById('mancanti-modal-overlay');
-  const tbody = document.getElementById('mancanti-tbody');
-  const count = document.getElementById('mancanti-count');
-  if (!overlay || !tbody) return;
-
+  const tbody   = document.getElementById('mancanti-tbody');
+  const count   = document.getElementById('mancanti-count');
+  if (!overlay || !tbody || !count) return;
   count.textContent = mancanti.length;
-  tbody.innerHTML = mancanti.slice(0, 20).map((m, i) => `
+  tbody.innerHTML = mancanti.slice(0, 20).map(m => `
     <tr>
       <td style="color:var(--text3);font-size:0.72rem">${m.cod}</td>
       <td>${m.prodotto}</td>
       <td><span style="font-size:0.65rem;background:rgba(75,157,232,0.12);color:var(--accent2);padding:0.1rem 0.35rem;border-radius:3px;font-family:'Barlow Condensed',sans-serif">${m.categoria}</span></td>
       <td style="text-align:right;color:var(--accent);font-family:'Barlow Condensed',sans-serif;font-weight:700">${fmt(m.incasso)}</td>
-    </tr>
-  `).join('');
-
-  if (mancanti.length > 20) {
-    tbody.innerHTML += `<tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:0.75rem;padding:0.5rem">...e altri ${mancanti.length - 20} prodotti</td></tr>`;
-  }
-
+    </tr>`).join('');
+  if (mancanti.length > 20) tbody.innerHTML += `<tr><td colspan="4" style="text-align:center;color:var(--text3);font-size:0.75rem;padding:0.5rem">...e altri ${mancanti.length - 20} prodotti</td></tr>`;
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -3650,159 +3691,19 @@ function apriTabFoodCost() {
   switchTab('foodcost');
 }
 
-// ===== FOOD COST CENTRALIZZATO =====
-let FOOD_COST_CENTRALE = {}; // { codice: { prodotto, categoria, costoUnit, fonte } }
-let fcModifiche = {};        // { codice: nuovoCosto } — modifiche non ancora salvate
-
-let fcLocaleCaricato = null; // traccia per quale locale è caricato il listino
-
-async function caricaFoodCostCentrale() {
-  try {
-    const adminUid = localStorage.getItem('ego_admin_uid') || window._adminUid;
-    if (!adminUid || !window._db) return;
-    const localeId = window.currentLocaleId || 'default';
-    const { doc, getDoc } = window._firestore;
-    const ref = doc(window._db, 'users', adminUid, 'foodcost_centrale', localeId);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      FOOD_COST_CENTRALE = snap.data().items || {};
-    } else {
-      FOOD_COST_CENTRALE = {};
-    }
-    fcLocaleCaricato = localeId;
-    fcModifiche = {};
-  } catch(e) {
-    console.error('Carica food cost:', e);
-  }
-}
-
-async function salvaFoodCost() {
-  if (!Object.keys(FOOD_COST_CENTRALE).length) {
-    alert('Nessun prodotto da salvare. Importa prima un file Excel.');
-    return;
-  }
-  const btn = document.getElementById('btn-fc-save');
-  btn.textContent = '⏳ Salvataggio...';
-  btn.disabled = true;
-  try {
-    // Applica modifiche al dizionario centrale
-    Object.entries(fcModifiche).forEach(([cod, val]) => {
-      if (FOOD_COST_CENTRALE[cod]) {
-        FOOD_COST_CENTRALE[cod].costoUnit = val;
-        FOOD_COST_CENTRALE[cod].fonte = 'manuale';
-      }
-    });
-    const adminUid = localStorage.getItem('ego_admin_uid') || window._adminUid;
-    const { doc, setDoc } = window._firestore;
-    await setDoc(
-      doc(window._db, 'users', adminUid, 'foodcost_centrale', window.currentLocaleId || currentLocaleId || 'default'),
-      { items: FOOD_COST_CENTRALE, aggiornato: new Date().toISOString() }
-    );
-    fcModifiche = {};
-    document.getElementById('btn-fc-save').style.display = 'none';
-    document.getElementById('btn-fc-ricalcola').style.display = '';
-    renderFoodCostTable();
-    alert('Food cost salvati! Premi "Ricalcola chiusure" per aggiornare i margini.');
-  } catch(e) {
-    alert('Errore salvataggio: ' + e.message);
-  } finally {
-    btn.textContent = '💾 Salva modifiche';
-    btn.disabled = false;
-  }
-}
-
-async function ricalcolaChiusure() {
-  if (!Object.keys(FOOD_COST_CENTRALE).length) {
-    alert('Nessun food cost caricato.');
-    return;
-  }
-  const btn = document.getElementById('btn-fc-ricalcola');
-  btn.textContent = '⏳ Ricalcolo...';
-  btn.disabled = true;
-  let aggiornate = 0;
-  try {
-    for (const chiusura of CHIUSURE) {
-      let modificato = false;
-      chiusura.chiusura.forEach(item => {
-        const k = String(Math.round(parseFloat(item.cod)));
-        const fc = FOOD_COST_CENTRALE[k];
-        if (fc && fc.costoUnit > 0) {
-          const vecchioCosto = item.costoUnit;
-          item.costoUnit = fc.costoUnit;
-          item.costoTot = fc.costoUnit * item.qty;
-          item.margineEuro = item.costoTot === 0 ? item.imponibile : item.imponibile - item.costoTot;
-          item.marginePerc = item.imponibile > 0 ? (item.margineEuro / item.imponibile) * 100 : 0;
-          if (vecchioCosto !== fc.costoUnit) modificato = true;
-        }
-      });
-      if (modificato) {
-        // Ricalcola totali chiusura
-        chiusura.totMargine = chiusura.chiusura.reduce((s,r) => s + r.margineEuro, 0);
-        chiusura.margEff = chiusura.totMargine - (chiusura.costiGiorn || 0);
-        await window._saveChiusura(chiusura);
-        aggiornate++;
-      }
-    }
-    btn.style.display = 'none';
-    alert(aggiornate + ' chiusure ricalcolate e aggiornate con i nuovi food cost!');
-    renderGiorniList();
-  } catch(e) {
-    alert('Errore ricalcolo: ' + e.message);
-  } finally {
-    btn.textContent = '🔄 Ricalcola chiusure';
-    btn.disabled = false;
-  }
-}
-
-function importFoodCostExcel(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const wb = XLSX.read(e.target.result, { type: 'array' });
-      const sheetName = wb.SheetNames.find(s => s.toUpperCase().includes('FOOD'));
-      if (!sheetName) { alert('Foglio FOOD-DRINK COST non trovato nel file.'); return; }
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header:1 });
-      let importati = 0;
-      for (let i = 1; i < rows.length; i++) {
-        const r = rows[i];
-        const cat  = String(r[0] || '').trim();
-        const prod = String(r[1] || '').trim();
-        const cod  = r[2] != null ? String(Math.round(parseFloat(r[2]))) : null;
-        const costo = parseFloat(r[4]) || 0;
-        if (!cod || cod === 'NaN' || !prod) continue;
-        FOOD_COST_CENTRALE[cod] = {
-          prodotto: prod,
-          categoria: cat,
-          costoUnit: costo,
-          fonte: costo > 0 ? 'excel' : 'excel_vuoto'
-        };
-        importati++;
-      }
-      fcModifiche = {};
-      document.getElementById('btn-fc-save').style.display = '';
-      document.getElementById('btn-fc-save').textContent = '💾 Salva ' + importati + ' prodotti';
-      renderFoodCostTable();
-      alert(importati + ' prodotti importati. Premi "Salva" per confermare.');
-    } catch(err) {
-      alert('Errore import: ' + err.message);
-    }
-  };
-  reader.readAsArrayBuffer(file);
-  event.target.value = '';
-}
-
-// Stato filtri food cost
-let fcFiltroAttivo = 'tutti'; // tutti | mancanti | completi | manuali
+// ── Render tabella ───────────────────────────────────────────────
+let fcFiltroAttivo = 'tutti';
 let fcColonne = { cod: true, cat: true, fonte: true };
+let fcModifiche = {}; // modifiche manuali non ancora salvate
 
 function fcSetFiltro(f) {
   fcFiltroAttivo = f;
   ['tutti','mancanti','completi','manuali'].forEach(id => {
     const btn = document.getElementById('fc-f-' + id);
     if (!btn) return;
-    btn.className = 'fc-filter-btn' + (id === f ? ' active' + (f === 'mancanti' ? ' red' : f === 'completi' ? ' grn' : '') : '');
+    const isActive = id === f;
+    const colorClass = f === 'mancanti' ? ' red' : f === 'completi' ? ' grn' : '';
+    btn.className = 'fc-filter-btn' + (isActive ? ' active' + colorClass : '');
   });
   renderFoodCostTable();
 }
@@ -3815,42 +3716,32 @@ function fcToggleCol(col) {
 }
 
 function renderFoodCostTable() {
-  const tbody = document.getElementById('fc-tbody');
+  const tbody   = document.getElementById('fc-tbody');
   const emptyEl = document.getElementById('fc-empty');
   const statsEl = document.getElementById('fc-stats');
   if (!tbody) return;
 
-  const search = (document.getElementById('fc-search')?.value || '').toLowerCase();
-  const items = Object.entries(FOOD_COST_CENTRALE);
+  const items = Object.entries(FC);
 
   if (!items.length) {
     tbody.innerHTML = '';
-    emptyEl.style.display = 'block';
+    if (emptyEl) emptyEl.style.display = 'block';
     if (statsEl) statsEl.innerHTML = '';
     return;
   }
-  emptyEl.style.display = 'none';
-  // Stats
-  const conCosto = items.filter(([,v]) => v.costoUnit > 0).length;
-  const senzaCosto = items.length - conCosto;
-  statsEl.innerHTML = `
-    <div class="fc-stat">Prodotti totali: <span>${items.length}</span></div>
-    <div class="fc-stat">Con costo: <span style="color:var(--green)">${conCosto}</span></div>
-    <div class="fc-stat">Senza costo: <span style="color:var(--red)">${senzaCosto}</span></div>
-    ${Object.keys(fcModifiche).length ? '<div class="fc-stat">Modifiche non salvate: <span style="color:var(--accent)">' + Object.keys(fcModifiche).length + '</span></div>' : ''}
-  `;
+  if (emptyEl) emptyEl.style.display = 'none';
 
-  // Filtro ricerca testo
-  let filtered = items;
-  if (search) {
-    filtered = items.filter(([cod, v]) =>
-      (v.prodotto||'').toLowerCase().includes(search) ||
-      (v.categoria||'').toLowerCase().includes(search) ||
-      cod.includes(search)
-    );
-  }
+  const search = (document.getElementById('fc-search')?.value || '').toLowerCase();
 
-  // Filtro stato
+  // Applica filtro ricerca
+  let filtered = search
+    ? items.filter(([cod, v]) =>
+        (v.prodotto||'').toLowerCase().includes(search) ||
+        (v.categoria||'').toLowerCase().includes(search) ||
+        cod.includes(search))
+    : [...items];
+
+  // Applica filtro stato
   if (fcFiltroAttivo === 'mancanti') {
     filtered = filtered.filter(([cod, v]) => {
       const c = fcModifiche[cod] !== undefined ? fcModifiche[cod] : v.costoUnit;
@@ -3865,84 +3756,184 @@ function renderFoodCostTable() {
     filtered = filtered.filter(([, v]) => v.fonte === 'manuale');
   }
 
-  // Ordina: prima senza costo, poi per categoria, poi per prodotto
+  // Ordina: mancanti prima, poi per categoria, poi per prodotto
   filtered.sort((a, b) => {
     const aHas = (fcModifiche[a[0]] !== undefined ? fcModifiche[a[0]] : a[1].costoUnit) > 0;
     const bHas = (fcModifiche[b[0]] !== undefined ? fcModifiche[b[0]] : b[1].costoUnit) > 0;
     if (aHas !== bHas) return aHas ? 1 : -1;
     const catCmp = (a[1].categoria||'').localeCompare(b[1].categoria||'');
-    if (catCmp !== 0) return catCmp;
-    return (a[1].prodotto||'').localeCompare(b[1].prodotto||'');
+    return catCmp !== 0 ? catCmp : (a[1].prodotto||'').localeCompare(b[1].prodotto||'');
   });
 
-  // Aggiorna header tabella in base alle colonne visibili
-  const theadRow = document.querySelector('.fc-table thead tr');
-  if (theadRow) {
-    theadRow.innerHTML =
-      (fcColonne.cod ? '<th>Codice</th>' : '') +
+  // Header colonne dinamico
+  const thead = document.querySelector('.fc-table thead tr');
+  if (thead) {
+    thead.innerHTML =
+      (fcColonne.cod   ? '<th>Cod.</th>' : '') +
       '<th>Prodotto</th>' +
-      (fcColonne.cat ? '<th>Categoria</th>' : '') +
-      '<th class="num">Costo unitario (€)</th>' +
+      (fcColonne.cat   ? '<th>Categoria</th>' : '') +
+      '<th class="num">Costo (€)</th>' +
       (fcColonne.fonte ? '<th class="num">Fonte</th>' : '');
   }
 
   tbody.innerHTML = filtered.map(([cod, v]) => {
-    const costo = fcModifiche[cod] !== undefined ? fcModifiche[cod] : v.costoUnit;
-    const hasVal = costo > 0;
+    const costo   = fcModifiche[cod] !== undefined ? fcModifiche[cod] : v.costoUnit;
+    const hasVal  = costo > 0;
     const changed = fcModifiche[cod] !== undefined;
-    const fonteLabel = v.fonte === 'manuale' ? 'manuale' : v.fonte === 'excel_vuoto' ? '—' : 'excel';
-    const fonteColor = v.fonte === 'manuale' ? 'color:var(--accent)' : 'color:var(--text3)';
+    const fonteLabel = v.fonte === 'manuale' ? 'man.' : v.fonte === 'mancante' ? '—' : 'xls';
+    const fonteColor = v.fonte === 'manuale' ? 'var(--accent)' : 'var(--text3)';
     return '<tr>' +
-      (fcColonne.cod ? '<td style="color:var(--text3);font-size:0.72rem">' + cod + '</td>' : '') +
-      '<td>' + (v.prodotto||'—') + (changed ? '<span class="fc-badge-changed"></span>' : '') + '</td>' +
-      (fcColonne.cat ? '<td><span class="cat-badge">' + (v.categoria||'').replace(/--/g,'').trim() + '</span></td>' : '') +
-      '<td style="text-align:right"><input class="fc-input ' + (hasVal ? 'has-value' : 'no-value') + '" type="number" step="0.01" min="0" value="' + (hasVal ? costo.toFixed(2) : '') + '" placeholder="0.00" onchange="fcCambiaValore(\'' + cod + '\', this.value)" oninput="fcCambiaValore(\'' + cod + '\', this.value)"></td>' +
-      (fcColonne.fonte ? '<td style="text-align:right;font-size:0.7rem"><span style="' + fonteColor + '">' + fonteLabel + '</span></td>' : '') +
+      (fcColonne.cod ? `<td style="color:var(--text3);font-size:0.7rem">${cod}</td>` : '') +
+      `<td>${v.prodotto||'—'}${changed ? '<span class="fc-badge-changed"></span>' : ''}</td>` +
+      (fcColonne.cat ? `<td><span class="cat-badge">${(v.categoria||'').replace(/--/g,'').trim()}</span></td>` : '') +
+      `<td style="text-align:right"><input class="fc-input ${hasVal?'has-value':'no-value'}" type="number" step="0.01" min="0" value="${hasVal?costo.toFixed(2):''}" placeholder="0.00" onchange="fcCambiaValore(\'${cod}\', this.value)" oninput="fcCambiaValore(\'${cod}\', this.value)"></td>` +
+      (fcColonne.fonte ? `<td style="text-align:right;font-size:0.7rem;color:${fonteColor}">${fonteLabel}</td>` : '') +
       '</tr>';
   }).join('');
 
-  // Mostra conteggio risultati nel filtro attivo
-  const stats = document.getElementById('fc-stats');
-  if (stats) {
-    const conCosto = items.filter(([cod,v]) => (fcModifiche[cod]!==undefined?fcModifiche[cod]:v.costoUnit) > 0).length;
-    const senzaCosto = items.length - conCosto;
-    stats.innerHTML =
-      '<div class="fc-stat">Totali: <span>' + items.length + '</span></div>' +
-      '<div class="fc-stat">Con costo: <span style="color:var(--green)">' + conCosto + '</span></div>' +
-      '<div class="fc-stat">Senza costo: <span style="color:var(--red)">' + senzaCosto + '</span></div>' +
-      (filtered.length !== items.length ? '<div class="fc-stat">Visualizzati: <span style="color:var(--accent2)">' + filtered.length + '</span></div>' : '') +
-      (Object.keys(fcModifiche).length ? '<div class="fc-stat">Non salvati: <span style="color:var(--accent)">' + Object.keys(fcModifiche).length + '</span></div>' : '');
+  // Stats
+  if (statsEl) {
+    const conCosto    = items.filter(([cod,v]) => (fcModifiche[cod]!==undefined?fcModifiche[cod]:v.costoUnit) > 0).length;
+    const senzaCosto  = items.length - conCosto;
+    const nMod        = Object.keys(fcModifiche).length;
+    statsEl.innerHTML =
+      `<div class="fc-stat">Totali: <span>${items.length}</span></div>` +
+      `<div class="fc-stat">Con costo: <span style="color:var(--green)">${conCosto}</span></div>` +
+      `<div class="fc-stat">Senza costo: <span style="color:var(--red)">${senzaCosto}</span></div>` +
+      (filtered.length !== items.length ? `<div class="fc-stat">Visualizzati: <span style="color:var(--accent2)">${filtered.length}</span></div>` : '') +
+      (nMod ? `<div class="fc-stat">Non salvati: <span style="color:var(--accent)">${nMod}</span></div>` : '');
   }
 }
 
 function fcCambiaValore(cod, val) {
   const v = parseFloat(val) || 0;
   fcModifiche[cod] = v;
-  // Mostra bottone salva
-  const btnSave = document.getElementById('btn-fc-save');
-  if (btnSave) {
-    btnSave.style.display = '';
-    btnSave.textContent = '💾 Salva modifiche (' + Object.keys(fcModifiche).length + ')';
+  const btn = document.getElementById('btn-fc-save');
+  if (btn) {
+    btn.style.display = '';
+    btn.textContent = '💾 Salva (' + Object.keys(fcModifiche).length + ')';
   }
-  // Aggiorna stats
-  renderFoodCostStats();
+  // Aggiorna stats inline senza re-render completo
+  const items = Object.entries(FC);
+  const statsEl = document.getElementById('fc-stats');
+  if (statsEl) {
+    const conCosto   = items.filter(([c,v2]) => (fcModifiche[c]!==undefined?fcModifiche[c]:v2.costoUnit) > 0).length;
+    const senzaCosto = items.length - conCosto;
+    const nMod       = Object.keys(fcModifiche).length;
+    statsEl.innerHTML =
+      `<div class="fc-stat">Totali: <span>${items.length}</span></div>` +
+      `<div class="fc-stat">Con costo: <span style="color:var(--green)">${conCosto}</span></div>` +
+      `<div class="fc-stat">Senza costo: <span style="color:var(--red)">${senzaCosto}</span></div>` +
+      (nMod ? `<div class="fc-stat">Non salvati: <span style="color:var(--accent)">${nMod}</span></div>` : '');
+  }
 }
 
-function renderFoodCostStats() {
-  const statsEl = document.getElementById('fc-stats');
-  if (!statsEl) return;
-  const items = Object.entries(FOOD_COST_CENTRALE);
-  const conCosto = items.filter(([cod, v]) => {
-    const c = fcModifiche[cod] !== undefined ? fcModifiche[cod] : v.costoUnit;
-    return c > 0;
-  }).length;
-  const senzaCosto = items.length - conCosto;
-  statsEl.innerHTML = `
-    <div class="fc-stat">Prodotti totali: <span>${items.length}</span></div>
-    <div class="fc-stat">Con costo: <span style="color:var(--green)">${conCosto}</span></div>
-    <div class="fc-stat">Senza costo: <span style="color:var(--red)">${senzaCosto}</span></div>
-    ${Object.keys(fcModifiche).length ? '<div class="fc-stat">Modifiche non salvate: <span style="color:var(--accent)">' + Object.keys(fcModifiche).length + '</span></div>' : ''}
-  `;
+async function salvaFoodCost() {
+  if (!Object.keys(FC).length && !Object.keys(fcModifiche).length) {
+    alert('Nessun prodotto da salvare.');
+    return;
+  }
+  const btn = document.getElementById('btn-fc-save');
+  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+  try {
+    // Applica modifiche manuali al dizionario
+    Object.entries(fcModifiche).forEach(([cod, val]) => {
+      if (FC[cod]) {
+        FC[cod].costoUnit = val;
+        FC[cod].fonte = 'manuale';
+      }
+    });
+    await fcSalva();
+    fcModifiche = {};
+    if (btn) { btn.style.display = 'none'; }
+    // Mostra bottone ricalcola
+    const btnR = document.getElementById('btn-fc-ricalcola');
+    if (btnR) btnR.style.display = '';
+    renderFoodCostTable();
+    alert('Salvato! Premi "Ricalcola chiusure" per aggiornare i margini.');
+  } catch(e) {
+    alert('Errore: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; }
+  }
+}
+
+async function ricalcolaChiusure() {
+  if (!Object.keys(FC).length) { alert('Nessun food cost caricato.'); return; }
+  const btn = document.getElementById('btn-fc-ricalcola');
+  if (btn) { btn.textContent = '⏳ Ricalcolo...'; btn.disabled = true; }
+  let aggiornate = 0;
+  try {
+    for (const chiusura of CHIUSURE) {
+      let modificato = false;
+      chiusura.chiusura.forEach(item => {
+        const k = String(Math.round(parseFloat(item.cod)));
+        const fc = FC[k];
+        if (fc && fc.costoUnit > 0) {
+          const vecchio = item.costoUnit;
+          item.costoUnit   = fc.costoUnit;
+          item.costoTot    = fc.costoUnit * item.qty;
+          item.margineEuro = item.imponibile - item.costoTot;
+          item.marginePerc = item.imponibile > 0 ? (item.margineEuro / item.imponibile) * 100 : 0;
+          if (vecchio !== fc.costoUnit) modificato = true;
+        }
+      });
+      if (modificato) {
+        chiusura.totMargine = chiusura.chiusura.reduce((s,r) => s + r.margineEuro, 0);
+        chiusura.margEff    = chiusura.totMargine - (chiusura.costiGiorn || 0);
+        await window._saveChiusura(chiusura);
+        aggiornate++;
+      }
+    }
+    if (btn) btn.style.display = 'none';
+    alert(aggiornate + ' chiusure aggiornate!');
+    renderGiorniList();
+  } catch(e) {
+    alert('Errore ricalcolo: ' + e.message);
+  } finally {
+    if (btn) { btn.textContent = '🔄 Ricalcola chiusure'; btn.disabled = false; }
+  }
+}
+
+function importFoodCostExcel(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const sheetName = wb.SheetNames.find(s => s.toUpperCase().includes('FOOD'));
+      if (!sheetName) { alert('Foglio FOOD-DRINK COST non trovato.'); return; }
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header:1 });
+      let nuovi = 0, aggiornati = 0;
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        const cat   = String(r[0]||'').trim();
+        const prod  = String(r[1]||'').trim();
+        const codRaw = r[2];
+        const costo = parseFloat(r[4]) || 0;
+        if (!codRaw || !prod) continue;
+        const cod = String(Math.round(parseFloat(codRaw)));
+        if (cod === 'NaN') continue;
+        if (!FC[cod]) {
+          FC[cod] = { prodotto: prod, categoria: cat, costoUnit: costo, fonte: costo > 0 ? 'excel' : 'mancante' };
+          nuovi++;
+        } else if (FC[cod].fonte !== 'manuale' && costo > 0) {
+          FC[cod].costoUnit = costo;
+          FC[cod].fonte = 'excel';
+          aggiornati++;
+        }
+      }
+      const btn = document.getElementById('btn-fc-save');
+      if (btn) { btn.style.display = ''; btn.textContent = '💾 Salva ' + (nuovi+aggiornati) + ' prodotti'; }
+      renderFoodCostTable();
+      alert(nuovi + ' nuovi prodotti, ' + aggiornati + ' aggiornati. Premi Salva per confermare.');
+    } catch(err) {
+      alert('Errore import: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value = '';
 }
 
 // ===== ANIMATED COUNTER =====
