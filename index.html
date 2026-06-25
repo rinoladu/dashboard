@@ -149,8 +149,7 @@ body {
 .login-note { color: var(--text3); font-size: 0.75rem; text-align: center; max-width: 280px; }
 
 /* ===== HOME ===== */
-#home-screen { display: none; flex-direction: column; min-height: 100vh; }
-#home-screen > div[id^="panel-"] { flex-shrink: 0; }
+#home-screen { display: none; flex-direction: column; }
 .home-header {
   background: rgba(7,9,12,0.9);
   border-bottom: 1px solid var(--border);
@@ -403,13 +402,34 @@ body {
 .fc-input.no-value { color:var(--text3); }
 .fc-badge-changed { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--accent); margin-left:4px; vertical-align:middle; }
 .fc-empty { text-align:center; padding:3rem; color:var(--text3); font-size:0.85rem; }
-#panel-foodcost { background:var(--bg); display:flex; flex-direction:column; }
-#panel-foodcost .fc-toolbar { order:0; }
-#panel-foodcost .fc-stats { order:1; }
-#panel-foodcost .fc-table-wrap { order:2; flex:0 0 auto; }
+#panel-foodcost { background:var(--bg); }
+#panel-foodcost .fc-toolbar { }
+#panel-foodcost .fc-stats { }
+#panel-foodcost .fc-table-wrap { }
 .fc-save-bar { position:sticky; bottom:0; background:var(--surface); border-top:1px solid var(--border); padding:0.8rem 1rem; display:none; align-items:center; justify-content:space-between; gap:1rem; z-index:10; }
 .fc-save-bar.visible { display:flex; }
 .fc-save-info { font-size:0.75rem; color:var(--accent); font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:0.06em; }
+.fc-filters { display:flex; gap:0.4rem; padding:0 1rem 0.5rem; flex-wrap:wrap; align-items:center; }
+.fc-filter-btn {
+  background:var(--surface2); border:1px solid var(--border); color:var(--text3);
+  border-radius:20px; padding:0.25rem 0.7rem; font-size:0.7rem; cursor:pointer;
+  font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:0.06em;
+  text-transform:uppercase; transition:all 0.2s; white-space:nowrap;
+}
+.fc-filter-btn:hover { border-color:var(--accent2); color:var(--accent2); }
+.fc-filter-btn.active { background:rgba(75,157,232,0.15); border-color:var(--accent2); color:var(--accent2); }
+.fc-filter-btn.active.red { background:rgba(232,75,75,0.15); border-color:var(--red); color:var(--red); }
+.fc-filter-btn.active.grn { background:rgba(61,214,140,0.15); border-color:var(--green); color:var(--green); }
+.fc-col-toggle { display:flex; gap:0.3rem; margin-left:auto; }
+.fc-col-btn {
+  background:var(--surface2); border:1px solid var(--border); color:var(--text3);
+  border-radius:6px; padding:0.2rem 0.5rem; font-size:0.65rem; cursor:pointer;
+  font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:0.05em;
+  text-transform:uppercase; transition:all 0.2s;
+}
+.fc-col-btn.active { background:rgba(232,184,75,0.12); border-color:rgba(232,184,75,0.3); color:var(--accent); }
+body.light .fc-filter-btn { background:#e8eaed; }
+body.light .fc-col-btn { background:#e8eaed; }
 body.light .fc-table th { background:#e8eaed; }
 body.light .fc-input { color:#3a4250; }
 body.light .fc-input.has-value { color:var(--green); }
@@ -967,7 +987,7 @@ body.light .emoji-btn { background: #e8eaed; }
 </div>
 
   <!-- TAB FOOD COST -->
-  <div id="panel-foodcost" style="display:none">
+  <div id="panel-foodcost" style="display:none;padding-top:0">
     <div class="fc-toolbar" style="margin-top:0.5rem">
       <input class="fc-search" type="text" id="fc-search" placeholder="🔍 Cerca prodotto o categoria..." oninput="renderFoodCostTable()">
       <div style="display:flex;gap:0.4rem;flex-wrap:wrap">
@@ -975,6 +995,18 @@ body.light .emoji-btn { background: #e8eaed; }
         <input type="file" id="fc-import-input" accept=".xlsx,.xls" style="display:none" onchange="importFoodCostExcel(event)">
         <button class="btn-fc primary" onclick="salvaFoodCost()" id="btn-fc-save" style="display:none">💾 Salva modifiche</button>
         <button class="btn-fc" onclick="ricalcolaChiusure()" id="btn-fc-ricalcola" style="display:none">🔄 Ricalcola chiusure</button>
+      </div>
+    </div>
+    <div class="fc-filters">
+      <button class="fc-filter-btn active" id="fc-f-tutti" onclick="fcSetFiltro('tutti')">Tutti</button>
+      <button class="fc-filter-btn" id="fc-f-mancanti" onclick="fcSetFiltro('mancanti')">⚠ Senza costo</button>
+      <button class="fc-filter-btn" id="fc-f-completi" onclick="fcSetFiltro('completi')">✓ Con costo</button>
+      <button class="fc-filter-btn" id="fc-f-manuali" onclick="fcSetFiltro('manuali')">✏ Manuali</button>
+      <div class="fc-col-toggle">
+        <span style="font-size:0.65rem;color:var(--text3);font-family:'Barlow Condensed',sans-serif;letter-spacing:0.06em;text-transform:uppercase;margin-right:0.2rem">Colonne:</span>
+        <button class="fc-col-btn active" id="fcc-cod" onclick="fcToggleCol('cod')">Cod.</button>
+        <button class="fc-col-btn active" id="fcc-cat" onclick="fcToggleCol('cat')">Cat.</button>
+        <button class="fc-col-btn active" id="fcc-fonte" onclick="fcToggleCol('fonte')">Fonte</button>
       </div>
     </div>
     <div class="fc-stats" id="fc-stats"></div>
@@ -3746,6 +3778,27 @@ function importFoodCostExcel(event) {
   event.target.value = '';
 }
 
+// Stato filtri food cost
+let fcFiltroAttivo = 'tutti'; // tutti | mancanti | completi | manuali
+let fcColonne = { cod: true, cat: true, fonte: true };
+
+function fcSetFiltro(f) {
+  fcFiltroAttivo = f;
+  ['tutti','mancanti','completi','manuali'].forEach(id => {
+    const btn = document.getElementById('fc-f-' + id);
+    if (!btn) return;
+    btn.className = 'fc-filter-btn' + (id === f ? ' active' + (f === 'mancanti' ? ' red' : f === 'completi' ? ' grn' : '') : '');
+  });
+  renderFoodCostTable();
+}
+
+function fcToggleCol(col) {
+  fcColonne[col] = !fcColonne[col];
+  const btn = document.getElementById('fcc-' + col);
+  if (btn) btn.className = 'fc-col-btn' + (fcColonne[col] ? ' active' : '');
+  renderFoodCostTable();
+}
+
 function renderFoodCostTable() {
   const tbody = document.getElementById('fc-tbody');
   const emptyEl = document.getElementById('fc-empty');
@@ -3772,7 +3825,7 @@ function renderFoodCostTable() {
     ${Object.keys(fcModifiche).length ? '<div class="fc-stat">Modifiche non salvate: <span style="color:var(--accent)">' + Object.keys(fcModifiche).length + '</span></div>' : ''}
   `;
 
-  // Filtro ricerca
+  // Filtro ricerca testo
   let filtered = items;
   if (search) {
     filtered = items.filter(([cod, v]) =>
@@ -3782,11 +3835,41 @@ function renderFoodCostTable() {
     );
   }
 
-  // Ordina: prima senza costo, poi per categoria
+  // Filtro stato
+  if (fcFiltroAttivo === 'mancanti') {
+    filtered = filtered.filter(([cod, v]) => {
+      const c = fcModifiche[cod] !== undefined ? fcModifiche[cod] : v.costoUnit;
+      return !(c > 0);
+    });
+  } else if (fcFiltroAttivo === 'completi') {
+    filtered = filtered.filter(([cod, v]) => {
+      const c = fcModifiche[cod] !== undefined ? fcModifiche[cod] : v.costoUnit;
+      return c > 0;
+    });
+  } else if (fcFiltroAttivo === 'manuali') {
+    filtered = filtered.filter(([, v]) => v.fonte === 'manuale');
+  }
+
+  // Ordina: prima senza costo, poi per categoria, poi per prodotto
   filtered.sort((a, b) => {
-    if ((a[1].costoUnit > 0) !== (b[1].costoUnit > 0)) return a[1].costoUnit > 0 ? 1 : -1;
-    return (a[1].categoria||'').localeCompare(b[1].categoria||'');
+    const aHas = (fcModifiche[a[0]] !== undefined ? fcModifiche[a[0]] : a[1].costoUnit) > 0;
+    const bHas = (fcModifiche[b[0]] !== undefined ? fcModifiche[b[0]] : b[1].costoUnit) > 0;
+    if (aHas !== bHas) return aHas ? 1 : -1;
+    const catCmp = (a[1].categoria||'').localeCompare(b[1].categoria||'');
+    if (catCmp !== 0) return catCmp;
+    return (a[1].prodotto||'').localeCompare(b[1].prodotto||'');
   });
+
+  // Aggiorna header tabella in base alle colonne visibili
+  const theadRow = document.querySelector('.fc-table thead tr');
+  if (theadRow) {
+    theadRow.innerHTML =
+      (fcColonne.cod ? '<th>Codice</th>' : '') +
+      '<th>Prodotto</th>' +
+      (fcColonne.cat ? '<th>Categoria</th>' : '') +
+      '<th class="num">Costo unitario (€)</th>' +
+      (fcColonne.fonte ? '<th class="num">Fonte</th>' : '');
+  }
 
   tbody.innerHTML = filtered.map(([cod, v]) => {
     const costo = fcModifiche[cod] !== undefined ? fcModifiche[cod] : v.costoUnit;
@@ -3794,23 +3877,27 @@ function renderFoodCostTable() {
     const changed = fcModifiche[cod] !== undefined;
     const fonteLabel = v.fonte === 'manuale' ? 'manuale' : v.fonte === 'excel_vuoto' ? '—' : 'excel';
     const fonteColor = v.fonte === 'manuale' ? 'color:var(--accent)' : 'color:var(--text3)';
-    return `<tr>
-      <td>${cod}</td>
-      <td>${v.prodotto || '—'}${changed ? '<span class="fc-badge-changed"></span>' : ''}</td>
-      <td><span class="cat-badge">${(v.categoria||'').replace(/--/g,'').trim()}</span></td>
-      <td style="text-align:right">
-        <input class="fc-input ${hasVal ? 'has-value' : 'no-value'}"
-          type="number" step="0.01" min="0"
-          value="${hasVal ? costo.toFixed(2) : ''}"
-          placeholder="0.00"
-          onchange="fcCambiaValore('${cod}', this.value)"
-          oninput="fcCambiaValore('${cod}', this.value)">
-      </td>
-      <td style="text-align:right;font-size:0.7rem" style="${fonteColor}">
-        <span style="${fonteColor}">${fonteLabel}</span>
-      </td>
-    </tr>`;
+    return '<tr>' +
+      (fcColonne.cod ? '<td style="color:var(--text3);font-size:0.72rem">' + cod + '</td>' : '') +
+      '<td>' + (v.prodotto||'—') + (changed ? '<span class="fc-badge-changed"></span>' : '') + '</td>' +
+      (fcColonne.cat ? '<td><span class="cat-badge">' + (v.categoria||'').replace(/--/g,'').trim() + '</span></td>' : '') +
+      '<td style="text-align:right"><input class="fc-input ' + (hasVal ? 'has-value' : 'no-value') + '" type="number" step="0.01" min="0" value="' + (hasVal ? costo.toFixed(2) : '') + '" placeholder="0.00" onchange="fcCambiaValore(\'' + cod + '\', this.value)" oninput="fcCambiaValore(\'' + cod + '\', this.value)"></td>' +
+      (fcColonne.fonte ? '<td style="text-align:right;font-size:0.7rem"><span style="' + fonteColor + '">' + fonteLabel + '</span></td>' : '') +
+      '</tr>';
   }).join('');
+
+  // Mostra conteggio risultati nel filtro attivo
+  const stats = document.getElementById('fc-stats');
+  if (stats) {
+    const conCosto = items.filter(([cod,v]) => (fcModifiche[cod]!==undefined?fcModifiche[cod]:v.costoUnit) > 0).length;
+    const senzaCosto = items.length - conCosto;
+    stats.innerHTML =
+      '<div class="fc-stat">Totali: <span>' + items.length + '</span></div>' +
+      '<div class="fc-stat">Con costo: <span style="color:var(--green)">' + conCosto + '</span></div>' +
+      '<div class="fc-stat">Senza costo: <span style="color:var(--red)">' + senzaCosto + '</span></div>' +
+      (filtered.length !== items.length ? '<div class="fc-stat">Visualizzati: <span style="color:var(--accent2)">' + filtered.length + '</span></div>' : '') +
+      (Object.keys(fcModifiche).length ? '<div class="fc-stat">Non salvati: <span style="color:var(--accent)">' + Object.keys(fcModifiche).length + '</span></div>' : '');
+  }
 }
 
 function fcCambiaValore(cod, val) {
