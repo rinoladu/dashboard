@@ -1476,9 +1476,10 @@ function subscribeToData(localeId) {
   window.currentLocaleId = localeId;
   // Reset cache previsioni al cambio locale
   if (typeof previsioniCache !== 'undefined') previsioniCache = {};
-  // Reset food cost (verrà ricaricato da Firestore)
+  // Reset food cost (verrà ricaricato da Firestore per il nuovo locale)
   FOOD_COST_CENTRALE = {};
   fcModifiche = {};
+  if (typeof fcLocaleCaricato !== 'undefined') fcLocaleCaricato = null;
   // Reset mese widget al corrente
   obiettivoMeseSelezionato = new Date().getMonth();
   obiettivoAnnoSelezionato = new Date().getFullYear();
@@ -1798,13 +1799,15 @@ function switchTab(tab) {
   document.getElementById('tab-foodcost').className = 'tab' + (tab === 'foodcost' ? ' active' : '');
   if (tab === 'analisi') renderGiorniListAnalisi();
   if (tab === 'foodcost') {
-    if (!Object.keys(FOOD_COST_CENTRALE).length) {
-      // Mostra empty state subito
+    const localeAttivo = window.currentLocaleId || 'default';
+    if (!Object.keys(FOOD_COST_CENTRALE).length || fcLocaleCaricato !== localeAttivo) {
+      // Locale cambiato o listino vuoto: ricarica da Firestore
       const fcEmpty = document.getElementById('fc-empty');
       const fcTbody = document.getElementById('fc-tbody');
+      const fcStats = document.getElementById('fc-stats');
       if (fcEmpty) fcEmpty.style.display = 'block';
-      if (fcTbody) fcTbody.innerHTML = '';
-      // Prova a caricare da Firestore (potrebbe non essere ancora arrivato)
+      if (fcTbody) fcTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:1rem;color:var(--text3);font-size:0.75rem">Caricamento...</td></tr>';
+      if (fcStats) fcStats.innerHTML = '';
       caricaFoodCostCentrale().then(() => renderFoodCostTable());
     } else {
       renderFoodCostTable();
@@ -3651,18 +3654,22 @@ function apriTabFoodCost() {
 let FOOD_COST_CENTRALE = {}; // { codice: { prodotto, categoria, costoUnit, fonte } }
 let fcModifiche = {};        // { codice: nuovoCosto } — modifiche non ancora salvate
 
+let fcLocaleCaricato = null; // traccia per quale locale è caricato il listino
+
 async function caricaFoodCostCentrale() {
   try {
     const adminUid = localStorage.getItem('ego_admin_uid') || window._adminUid;
     if (!adminUid || !window._db) return;
+    const localeId = window.currentLocaleId || 'default';
     const { doc, getDoc } = window._firestore;
-    const ref = doc(window._db, 'users', adminUid, 'foodcost_centrale', window.currentLocaleId || 'default');
+    const ref = doc(window._db, 'users', adminUid, 'foodcost_centrale', localeId);
     const snap = await getDoc(ref);
     if (snap.exists()) {
       FOOD_COST_CENTRALE = snap.data().items || {};
     } else {
       FOOD_COST_CENTRALE = {};
     }
+    fcLocaleCaricato = localeId;
     fcModifiche = {};
   } catch(e) {
     console.error('Carica food cost:', e);
