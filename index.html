@@ -3143,8 +3143,21 @@ function generaPrevisioni() {
 
   const lordo = c => c.totLordo || (c.totImponibile || 0) * 1.10;
   const giorniNelMese = new Date(anno, mese + 1, 0).getDate();
+  // Usa l'ultimo giorno con chiusura caricata come riferimento,
+  // non la data di oggi — così funziona anche se non hai ancora
+  // caricato le chiusure degli ultimi giorni
+  // giornoRiferimento = giorno dell'ultima chiusura caricata
+  // giorniRimasti = giorni del mese - giornoRiferimento
+  // Questo funziona anche se non hai ancora caricato le chiusure più recenti
+  const ultimaChiusura = chiusureMese[chiusureMese.length - 1];
+  const giornoUltimaChiusura = ultimaChiusura
+    ? new Date(ultimaChiusura.data + 'T00:00:00').getDate()
+    : ora.getDate();
+  // giornoOggi per le statistiche (alert, BEP) usa oggi reale
+  // giornoRif per la proiezione usa l'ultima chiusura caricata
   const giornoOggi = ora.getDate();
-  const giorniRimasti = giorniNelMese - giornoOggi;
+  const giornoRif = giornoUltimaChiusura;
+  const giorniRimasti = giorniNelMese - giornoRif;
   const totaleFinora = chiusureMese.reduce((s,c) => s + lordo(c), 0);
   const n = chiusureMese.length;
   const mediaGiornaliera = totaleFinora / n;
@@ -3160,7 +3173,7 @@ function generaPrevisioni() {
   const trendDirezione = mediaFine - mediaInizio; // positivo = crescita
 
   // ── Proiezione basata su media giornaliera reale ─────────────
-  const ratioChiusure = n / Math.max(1, giornoOggi);
+  const ratioChiusure = n / Math.max(1, giornoRif);
   const chiusurePreviste = Math.round(giorniRimasti * ratioChiusure);
   // Base: media globale del mese (robusta, ignora spike)
   const proiezioneLineare = totaleFinora + mediaGiornaliera * chiusurePreviste;
