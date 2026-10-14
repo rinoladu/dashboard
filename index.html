@@ -825,6 +825,7 @@ body.light .emoji-btn { background: #e8eaed; }
       <button class="btn-sm" onclick="exportData()">📤 <span class="btn-label">Esporta</span></button>
       <button class="btn-sm" onclick="document.getElementById('import-input').click()">📥 <span class="btn-label">Importa</span></button>
       <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
+      <a href="ricettario.html" class="btn-sm" style="text-decoration:none" title="Ricettario">🍽 <span class="btn-label">Ricettario</span></a>
       <button class="btn-sm logout" onclick="logoutUtente()" title="Esci">👤 <span class="btn-label">Esci</span></button>
     </div>
   </div>
@@ -2273,7 +2274,10 @@ function parseWorkbook(wb, filename, periodo, mese=null) {
     delete item._totImp; delete item._margine; delete item._costoTot;
   });
   result.totImponibile=result.chiusura.reduce((s,r)=>s+r.imponibile,0);
-  result.totLordo=result.totImponibile*1.10;
+  // Usa la somma dei TOTALE reali dal file come lordo (gestisce IVA mista 10%/22%)
+  // Se tutti i totale sono 0 (file senza questa colonna), fallback a imponibile*1.10
+  const totLordoReale = result.chiusura.reduce((s,r)=>s+(r.totale||0),0);
+  result.totLordo = totLordoReale > 0 ? totLordoReale : result.totImponibile*1.10;
   result.totMargine=result.chiusura.reduce((s,r)=>s+r.margineEuro,0);
   result.margEff=result.totMargine-result.costiGiorn;
   const dm=(result.filename||'').match(/(\d{1,2})[-_\/](\d{1,2})[-_\/](\d{2,4})/);
