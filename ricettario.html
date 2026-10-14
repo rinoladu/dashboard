@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Ricettario EGO</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#07090c; --surface:#141720; --surface2:#1e2230; --border:rgba(255,255,255,0.1);
+  --accent:#e8b84b; --accent2:#4b9de8; --text:#f0f2f5; --text2:#9aa0ad; --text3:#6b7280;
+  --green:#3dd68c; --red:#e84b4b;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Barlow',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* HEADER */
+.header{background:rgba(14,17,26,0.95);border-bottom:1px solid var(--border);padding:0.8rem 1.2rem;
+  display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;
+  backdrop-filter:blur(20px)}
+.logo{font-family:'Barlow Condensed',sans-serif;font-size:1.6rem;font-weight:900;
+  background:linear-gradient(135deg,#e8b84b,#f5d98a);-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.1em}
+.logo-sub{font-size:0.65rem;color:var(--text3);font-family:'Barlow Condensed',sans-serif;
+  letter-spacing:0.15em;text-transform:uppercase;margin-top:-2px}
+
+/* TABS */
+.tabs{display:flex;background:rgba(7,9,12,0.9);border-bottom:1px solid var(--border);padding:0 1rem}
+.tab{font-family:'Barlow Condensed',sans-serif;font-size:0.82rem;font-weight:700;
+  letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);
+  padding:0.75rem 1rem;cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab:hover:not(.active){color:var(--text2)}
+
+/* PANELS */
+.panel{display:none;padding:1rem}
+.panel.active{display:block}
+
+/* TOOLBAR */
+.toolbar{display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
+.search{flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);border-radius:8px;padding:0.45rem 0.8rem;font-size:0.82rem;
+  font-family:'Barlow',sans-serif;outline:none}
+.search:focus{border-color:rgba(75,157,232,0.4)}
+.search::placeholder{color:var(--text3)}
+.btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);
+  border-radius:8px;padding:0.45rem 0.9rem;font-size:0.72rem;cursor:pointer;
+  font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.08em;
+  text-transform:uppercase;transition:all 0.2s;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:rgba(232,184,75,0.15);border-color:rgba(232,184,75,0.4);color:var(--accent)}
+.btn.primary:hover{background:rgba(232,184,75,0.25)}
+.btn.blue{background:rgba(75,157,232,0.12);border-color:rgba(75,157,232,0.3);color:var(--accent2)}
+.btn.danger:hover{border-color:var(--red);color:var(--red)}
+
+/* STATS BAR */
+.stats-bar{display:flex;gap:1.5rem;margin-bottom:1rem;flex-wrap:wrap}
+.stat-item{display:flex;flex-direction:column;gap:0.1rem}
+.stat-label{font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--text3);font-family:'Barlow Condensed',sans-serif}
+.stat-value{font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;color:var(--accent)}
+
+/* GRID CARDS */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.8rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:1rem;cursor:pointer;transition:all 0.25s;position:relative;overflow:hidden}
+.card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent)}
+.card:hover{border-color:rgba(232,184,75,0.4);transform:translateY(-2px);
+  box-shadow:0 6px 24px rgba(0,0,0,0.3)}
+.card-name{font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:700;
+  margin-bottom:0.5rem;color:var(--text)}
+.card-cat{font-size:0.62rem;background:rgba(75,157,232,0.12);color:var(--accent2);
+  padding:0.1rem 0.4rem;border-radius:3px;font-family:'Barlow Condensed',sans-serif;
+  font-weight:700;letter-spacing:0.06em;display:inline-block;margin-bottom:0.6rem}
+.card-row{display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text3);margin-top:0.2rem}
+.card-row span{color:var(--text2);font-weight:600}
+.fc-badge{font-size:0.7rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;
+  padding:0.15rem 0.5rem;border-radius:4px;margin-top:0.4rem;display:inline-block}
+.fc-ok{background:rgba(61,214,140,0.15);color:var(--green)}
+.fc-warn{background:rgba(232,184,75,0.15);color:var(--accent)}
+.fc-bad{background:rgba(232,75,75,0.15);color:var(--red)}
+.fc-none{background:rgba(255,255,255,0.06);color:var(--text3)}
+
+/* TABLE */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:0.8rem}
+th{background:var(--surface2);color:var(--text3);font-family:'Barlow Condensed',sans-serif;
+  font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.55rem 0.7rem;
+  text-align:left;position:sticky;top:0}
+th.num{text-align:right}
+td{padding:0.5rem 0.7rem;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:middle}
+td.num{text-align:right;font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--text)}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.cat-tag{font-size:0.62rem;background:rgba(75,157,232,0.12);color:var(--accent2);
+  padding:0.1rem 0.35rem;border-radius:3px;font-family:'Barlow Condensed',sans-serif;white-space:nowrap}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;
+  align-items:flex-end;justify-content:center;backdrop-filter:blur(6px)}
+.overlay.open{display:flex}
+@media(min-width:600px){.overlay{align-items:center}}
+.modal{background:#0f1319;border:1px solid var(--border);border-radius:20px 20px 0 0;
+  width:100%;max-width:640px;max-height:92vh;overflow-y:auto;padding:1.2rem 1.2rem 2rem;
+  animation:slideUp 0.25s ease}
+@media(min-width:600px){.modal{border-radius:20px}}
+@keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-handle{width:36px;height:3px;background:var(--border);border-radius:2px;margin:0 auto 1rem}
+.modal-title{font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:800;
+  background:linear-gradient(135deg,var(--accent),#f5d98a);-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.05em;
+  text-transform:uppercase;margin-bottom:1rem;text-align:center}
+.modal-close{position:absolute;top:1rem;right:1rem;background:var(--surface2);
+  border:1px solid var(--border);color:var(--text2);width:30px;height:30px;border-radius:50%;
+  font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.modal-close:hover{border-color:var(--red);color:var(--red)}
+.form-row{display:flex;flex-direction:column;gap:0.3rem;margin-bottom:0.8rem}
+.form-label{font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--text3);font-family:'Barlow Condensed',sans-serif;font-weight:700}
+.form-input{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;padding:0.6rem 0.8rem;font-size:0.9rem;font-family:'Barlow',sans-serif;
+  outline:none;width:100%;transition:border-color 0.2s}
+.form-input:focus{border-color:rgba(232,184,75,0.4)}
+.form-input::placeholder{color:var(--text3)}
+.form-row-2{display:grid;grid-template-columns:1fr 1fr;gap:0.8rem}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.6rem}
+.btn-save{display:block;width:100%;background:linear-gradient(135deg,var(--accent),#f5d98a);
+  color:#0a0800;font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:800;
+  letter-spacing:0.08em;text-transform:uppercase;padding:0.75rem;border-radius:10px;
+  border:none;cursor:pointer;margin-top:1rem;transition:all 0.2s}
+.btn-save:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(232,184,75,0.3)}
+.err{color:var(--red);font-size:0.75rem;text-align:center;min-height:1rem;margin-top:0.4rem}
+.select{appearance:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;padding:0.6rem 0.8rem;font-size:0.9rem;font-family:'Barlow',sans-serif;
+  outline:none;width:100%;cursor:pointer}
+.select:focus{border-color:rgba(232,184,75,0.4)}
+
+/* INGREDIENTI RICETTA */
+.ing-list{display:flex;flex-direction:column;gap:0.4rem;margin:0.6rem 0}
+.ing-row{display:grid;grid-template-columns:1fr 80px 80px 30px;gap:0.4rem;align-items:center}
+.ing-row .form-input{padding:0.4rem 0.6rem;font-size:0.82rem}
+.btn-rm{background:none;border:none;color:var(--text3);cursor:pointer;font-size:1rem;
+  display:flex;align-items:center;justify-content:center;transition:color 0.2s}
+.btn-rm:hover{color:var(--red)}
+.ing-cost-preview{font-size:0.7rem;color:var(--text3);font-family:'Barlow Condensed',sans-serif;
+  text-align:right;margin-top:-0.3rem;margin-right:30px}
+
+/* FATTURE */
+.fattura-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:0.9rem 1rem;margin-bottom:0.6rem;cursor:pointer;transition:all 0.2s}
+.fattura-card:hover{border-color:rgba(232,184,75,0.3)}
+.fattura-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.4rem}
+.fattura-fornitore{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem}
+.fattura-meta{font-size:0.72rem;color:var(--text3)}
+.fattura-totale{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--accent);font-size:1rem}
+.badge-new{background:rgba(232,184,75,0.2);color:var(--accent);font-size:0.62rem;
+  font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.08em;
+  padding:0.1rem 0.4rem;border-radius:4px}
+.badge-ok{background:rgba(61,214,140,0.15);color:var(--green);font-size:0.62rem;
+  font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.08em;
+  padding:0.1rem 0.4rem;border-radius:4px}
+
+/* ASSOC */
+.assoc-row{display:grid;grid-template-columns:1fr auto;gap:0.5rem;align-items:center;
+  background:var(--surface2);border-radius:8px;padding:0.6rem 0.8rem;margin-bottom:0.4rem}
+.assoc-articolo{font-size:0.82rem;color:var(--text)}
+.assoc-prezzo{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--text3);font-size:0.82rem}
+.assoc-form{display:grid;grid-template-columns:1fr 60px 60px 80px;gap:0.4rem;margin-top:0.4rem;align-items:center}
+
+/* EMPTY */
+.empty{text-align:center;padding:3rem 1rem;color:var(--text3)}
+.empty-icon{font-size:2.5rem;margin-bottom:0.8rem}
+.empty h3{font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;color:var(--text2);margin-bottom:0.4rem}
+
+/* LOGIN */
+#login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;gap:1.5rem;padding:2rem}
+.login-logo{font-family:'Barlow Condensed',sans-serif;font-size:3.5rem;font-weight:900;
+  background:linear-gradient(135deg,#e8b84b,#f5d98a);-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.1em}
+.login-sub{color:var(--text3);font-size:0.8rem;letter-spacing:0.12em;text-transform:uppercase;
+  font-family:'Barlow Condensed',sans-serif;margin-top:-1rem}
+.btn-google{display:flex;align-items:center;gap:0.8rem;background:var(--surface);
+  border:1px solid var(--border);color:var(--text);padding:0.85rem 1.6rem;border-radius:12px;
+  font-size:0.9rem;cursor:pointer;font-family:'Barlow',sans-serif;font-weight:500;transition:all 0.25s}
+.btn-google:hover{border-color:var(--accent);color:var(--accent)}
+.btn-google svg{width:18px;height:18px}
+
+/* CHIP CATEGORIA */
+.chip{display:inline-flex;align-items:center;gap:0.3rem;background:var(--surface2);
+  border:1px solid var(--border);border-radius:20px;padding:0.2rem 0.6rem;
+  font-size:0.7rem;color:var(--text2);cursor:pointer;transition:all 0.15s;white-space:nowrap}
+.chip.active{background:rgba(75,157,232,0.15);border-color:rgba(75,157,232,0.4);color:var(--accent2)}
+.chips{display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.8rem}
+
+/* RICETTA DETTAGLIO */
+.detail-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;margin-bottom:1rem}
+.kpi-card{background:var(--surface2);border-radius:10px;padding:0.7rem 0.8rem}
+.kpi-label{font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--text3);font-family:'Barlow Condensed',sans-serif}
+.kpi-val{font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:800;margin-top:0.2rem}
+
+.spinner{width:36px;height:36px;border:2px solid rgba(255,255,255,0.08);
+  border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading{display:none;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;gap:1rem}
+
+.section-title{font-family:'Barlow Condensed',sans-serif;font-size:0.7rem;font-weight:700;
+  letter-spacing:0.2em;text-transform:uppercase;color:var(--text3);
+  padding:0.3rem 0;margin-bottom:0.5rem;border-bottom:1px solid var(--border)}
+.divider{border:none;border-top:1px solid var(--border);margin:0.8rem 0}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-logo">Ricettario</div>
+  <div class="login-sub">by EGO Dashboard</div>
+  <button class="btn-google" onclick="loginGoogle()">
+    <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+    Accedi con Google
+  </button>
+  <div style="color:var(--red);font-size:0.78rem" id="login-err"></div>
+</div>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="color:var(--text2);font-size:0.85rem">Caricamento...</div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <div class="header">
+    <div>
+      <div class="logo">Ricettario</div>
+      <div class="logo-sub">Food Cost Manager</div>
+    </div>
+    <div style="display:flex;gap:0.5rem;align-items:center">
+      <div id="locale-badge" style="font-size:0.7rem;color:var(--text3);font-family:'Barlow Condensed',sans-serif;letter-spacing:0.08em;text-transform:uppercase"></div>
+      <button class="btn danger" onclick="logout()">Esci</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('ingredienti')" id="t-ingredienti">Ingredienti</div>
+    <div class="tab" onclick="switchTab('ricette')" id="t-ricette">Ricette</div>
+    <div class="tab" onclick="switchTab('fatture')" id="t-fatture">Fatture</div>
+    <div class="tab" onclick="switchTab('associazioni')" id="t-associazioni">Associazioni</div>
+  </div>
+
+  <!-- INGREDIENTI -->
+  <div class="panel active" id="p-ingredienti">
+    <div class="toolbar">
+      <input class="search" type="text" id="ing-search" placeholder="🔍 Cerca ingrediente..." oninput="renderIngredienti()">
+      <button class="btn blue" onclick="apriModalIngrediente()">+ Nuovo ingrediente</button>
+    </div>
+    <div class="chips" id="ing-chips"></div>
+    <div class="stats-bar" id="ing-stats"></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ingrediente</th>
+            <th>Categoria</th>
+            <th class="num">Costo unitario</th>
+            <th class="num">U.M.</th>
+            <th class="num">Ricette</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="ing-tbody"></tbody>
+      </table>
+      <div id="ing-empty" class="empty" style="display:none">
+        <div class="empty-icon">🧅</div>
+        <h3>Nessun ingrediente</h3>
+        <p>Aggiungi il primo ingrediente o importa una fattura XML</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- RICETTE -->
+  <div class="panel" id="p-ricette">
+    <div class="toolbar">
+      <input class="search" type="text" id="ric-search" placeholder="🔍 Cerca ricetta..." oninput="renderRicette()">
+      <select class="select" id="ric-cat-filter" onchange="renderRicette()" style="width:auto;padding:0.45rem 0.8rem;font-size:0.8rem">
+        <option value="">Tutte le categorie</option>
+      </select>
+      <button class="btn blue" onclick="apriModalRicetta()">+ Nuova ricetta</button>
+    </div>
+    <div class="stats-bar" id="ric-stats"></div>
+    <div class="grid" id="ric-grid"></div>
+    <div id="ric-empty" class="empty" style="display:none">
+      <div class="empty-icon">🍽</div>
+      <h3>Nessuna ricetta</h3>
+      <p>Crea la prima ricetta con i tuoi ingredienti</p>
+    </div>
+  </div>
+
+  <!-- FATTURE -->
+  <div class="panel" id="p-fatture">
+    <div class="toolbar">
+      <button class="btn primary" onclick="document.getElementById('xml-input').click()">📄 Carica fattura XML</button>
+      <input type="file" id="xml-input" accept=".xml" multiple style="display:none" onchange="caricaFattureXML(event)">
+      <input class="search" type="text" id="fat-search" placeholder="🔍 Cerca fornitore..." oninput="renderFatture()" style="max-width:280px">
+    </div>
+    <div class="stats-bar" id="fat-stats"></div>
+    <div id="fat-list"></div>
+    <div id="fat-empty" class="empty" style="display:none">
+      <div class="empty-icon">🧾</div>
+      <h3>Nessuna fattura</h3>
+      <p>Carica un file XML di fattura elettronica italiana</p>
+    </div>
+  </div>
+
+  <!-- ASSOCIAZIONI -->
+  <div class="panel" id="p-associazioni">
+    <div class="toolbar">
+      <input class="search" type="text" id="ass-search" placeholder="🔍 Cerca articolo..." oninput="renderAssociazioni()">
+      <select class="select" id="ass-filter" onchange="renderAssociazioni()" style="width:auto;padding:0.45rem 0.8rem;font-size:0.8rem">
+        <option value="tutti">Tutti</option>
+        <option value="da_associare">Da associare</option>
+        <option value="associati">Associati</option>
+      </select>
+    </div>
+    <div class="stats-bar" id="ass-stats"></div>
+    <div id="ass-list"></div>
+    <div id="ass-empty" class="empty" style="display:none">
+      <div class="empty-icon">🔗</div>
+      <h3>Nessun articolo</h3>
+      <p>Carica una fattura XML per vedere gli articoli da associare</p>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL INGREDIENTE -->
+<div class="overlay" id="ov-ing" onclick="if(event.target===this)closeModal('ov-ing')">
+  <div class="modal" style="position:relative">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('ov-ing')">✕</button>
+    <div class="modal-title" id="ing-modal-title">Nuovo ingrediente</div>
+    <div class="form-row">
+      <div class="form-label">Nome ingrediente</div>
+      <input class="form-input" id="ing-nome" placeholder="es. calamaro, olio evo...">
+    </div>
+    <div class="form-row-2">
+      <div class="form-row">
+        <div class="form-label">Categoria</div>
+        <input class="form-input" id="ing-cat" placeholder="es. Food/Ittico" list="cat-datalist">
+        <datalist id="cat-datalist"></datalist>
+      </div>
+      <div class="form-row">
+        <div class="form-label">Unità di misura</div>
+        <select class="select" id="ing-um">
+          <option value="KG">KG</option>
+          <option value="KG (a peso)">KG (a peso)</option>
+          <option value="LT">LT</option>
+          <option value="PZ">PZ</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row-2">
+      <div class="form-row">
+        <div class="form-label">Costo unitario (€)</div>
+        <input class="form-input" type="number" step="0.001" min="0" id="ing-costo" placeholder="0.00">
+      </div>
+      <div class="form-row">
+        <div class="form-label">Scarto % (pulizia)</div>
+        <input class="form-input" type="number" step="1" min="0" max="100" id="ing-scarto" placeholder="0" value="0">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-label">Note</div>
+      <input class="form-input" id="ing-note" placeholder="Opzionale">
+    </div>
+    <button class="btn-save" onclick="salvaIngrediente()">Salva ingrediente</button>
+    <div class="err" id="ing-err"></div>
+    <input type="hidden" id="ing-edit-id">
+  </div>
+</div>
+
+<!-- MODAL RICETTA -->
+<div class="overlay" id="ov-ric" onclick="if(event.target===this)closeModal('ov-ric')">
+  <div class="modal" style="position:relative;max-width:680px">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('ov-ric')">✕</button>
+    <div class="modal-title" id="ric-modal-title">Nuova ricetta</div>
+    <div class="form-row-2">
+      <div class="form-row">
+        <div class="form-label">Nome piatto</div>
+        <input class="form-input" id="ric-nome" placeholder="es. Astice Catalana">
+      </div>
+      <div class="form-row">
+        <div class="form-label">Categoria</div>
+        <input class="form-input" id="ric-cat" placeholder="es. --Secondi piatti--" list="cat-ric-datalist">
+        <datalist id="cat-ric-datalist"></datalist>
+      </div>
+    </div>
+    <div class="form-row-2">
+      <div class="form-row">
+        <div class="form-label">Prezzo di vendita (€)</div>
+        <input class="form-input" type="number" step="0.01" min="0" id="ric-prezzo" placeholder="0.00" oninput="aggiornaCostoRicettaPreview()">
+      </div>
+      <div class="form-row">
+        <div class="form-label">Porzioni</div>
+        <input class="form-input" type="number" step="1" min="1" id="ric-porzioni" placeholder="1" value="1" oninput="aggiornaCostoRicettaPreview()">
+      </div>
+    </div>
+    <hr class="divider">
+    <div class="section-title">Ingredienti</div>
+    <div id="ing-list-ric"></div>
+    <button class="btn blue" onclick="aggiungiIngredienteRicetta()" style="width:100%;margin-bottom:0.8rem">+ Aggiungi ingrediente</button>
+    <div style="background:var(--surface2);border-radius:10px;padding:0.8rem;margin-bottom:0.6rem">
+      <div id="ric-cost-preview" style="font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;color:var(--text3)">
+        Aggiungi ingredienti per calcolare il food cost
+      </div>
+    </div>
+    <button class="btn-save" onclick="salvaRicetta()">Salva ricetta</button>
+    <div class="err" id="ric-err"></div>
+    <input type="hidden" id="ric-edit-id">
+  </div>
+</div>
+
+<!-- MODAL ASSOCIAZIONE -->
+<div class="overlay" id="ov-ass" onclick="if(event.target===this)closeModal('ov-ass')">
+  <div class="modal" style="position:relative">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('ov-ass')">✕</button>
+    <div class="modal-title">Associa articolo</div>
+    <div style="background:var(--surface2);border-radius:8px;padding:0.7rem 0.9rem;margin-bottom:1rem">
+      <div style="font-size:0.65rem;color:var(--text3);font-family:'Barlow Condensed',sans-serif;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.2rem">Articolo fattura</div>
+      <div id="ass-articolo-nome" style="font-weight:700;font-size:0.95rem"></div>
+      <div id="ass-articolo-meta" style="font-size:0.72rem;color:var(--text3);margin-top:0.2rem"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-label">Ingrediente generico</div>
+      <input class="form-input" id="ass-ing-search" placeholder="Cerca o crea ingrediente..." oninput="cercaIngredienteAssoc(this.value)" autocomplete="off">
+      <div id="ass-ing-suggestions" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-top:0.3rem;display:none;max-height:180px;overflow-y:auto"></div>
+      <input type="hidden" id="ass-ing-id">
+    </div>
+    <div class="section-title" style="margin-top:0.5rem">Conversione unità</div>
+    <div style="font-size:0.75rem;color:var(--text3);margin-bottom:0.6rem">
+      Quante unità base contiene il formato acquistato? (es. bottiglia 0,7 LT → metti 0.7 in LT)
+    </div>
+    <div class="form-row-3">
+      <div class="form-row">
+        <div class="form-label">Pezzi per collo</div>
+        <input class="form-input" type="number" step="1" min="1" id="ass-pezzi" placeholder="1" value="1">
+      </div>
+      <div class="form-row">
+        <div class="form-label">Quantità per pezzo</div>
+        <input class="form-input" type="number" step="0.001" min="0" id="ass-qty" placeholder="1" value="1">
+      </div>
+      <div class="form-row">
+        <div class="form-label">Unità di misura</div>
+        <select class="select" id="ass-um">
+          <option value="KG">KG</option>
+          <option value="LT">LT</option>
+          <option value="PZ">PZ</option>
+        </select>
+      </div>
+    </div>
+    <div id="ass-costo-preview" style="background:var(--surface2);border-radius:8px;padding:0.6rem 0.8rem;font-size:0.78rem;color:var(--text3);margin-bottom:0.5rem"></div>
+    <button class="btn-save" onclick="salvaAssociazione()">Salva associazione</button>
+    <div class="err" id="ass-err"></div>
+    <input type="hidden" id="ass-edit-key">
+  </div>
+</div>
+
+<!-- MODAL DETTAGLIO RICETTA -->
+<div class="overlay" id="ov-ric-detail" onclick="if(event.target===this)closeModal('ov-ric-detail')">
+  <div class="modal" style="position:relative;max-width:640px">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('ov-ric-detail')">✕</button>
+    <div id="ric-detail-content"></div>
+  </div>
+</div>
+
+<!-- FIREBASE -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, query, orderBy, writeBatch }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAGPH0GXWA2gY_nFhJ0m3rqjfNWZ9FAP8k",
+  authDomain: "ego-dashboard-993e4.firebaseapp.com",
+  projectId: "ego-dashboard-993e4",
+  storageBucket: "ego-dashboard-993e4.firebasestorage.app",
+  messagingSenderId: "562196316820",
+  appId: "1:562196316820:web:a5a466f922af91abd32a81"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+// Expose helpers
+window._db = db;
+window._fs = { doc, setDoc, getDoc, getDocs, deleteDoc, collection, query, orderBy, writeBatch };
+
+window.loginGoogle = async () => {
+  try {
+    document.getElementById('login-err').textContent = '';
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isSafari || isIOS) await signInWithRedirect(auth, provider);
+    else await signInWithPopup(auth, provider);
+  } catch(e) { document.getElementById('login-err').textContent = 'Errore accesso: ' + e.message; }
+};
+
+window.logout = async () => {
+  if (!confirm('Uscire?')) return;
+  await signOut(auth);
+};
+
+getRedirectResult(auth).catch(() => {});
+
+const ADMIN_UID = 'locales_ricettario'; // namespace Firestore
+
+onAuthStateChanged(auth, async user => {
+  document.getElementById('login-screen').style.display = 'none';
+  if (!user) {
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    return;
+  }
+  document.getElementById('loading').style.display = 'flex';
+  window._uid = user.uid;
+  window._userEmail = user.email;
+  document.getElementById('locale-badge').textContent = user.email;
+
+  // Carica tutto
+  await Promise.all([caricaIngredienti(), caricaRicette(), caricaFatture(), caricaAssociazioni()]);
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  renderIngredienti();
+  renderRicette();
+  renderFatture();
+  renderAssociazioni();
+});
+
+// ── FIRESTORE HELPERS ──────────────────────────────────────────────
+const colRef = (col) => collection(db, 'ricettario', window._uid, col);
+const docRef = (col, id) => doc(db, 'ricettario', window._uid, col, id);
+
+window._save = async (col, id, data) => {
+  await setDoc(docRef(col, id), data);
+};
+window._del = async (col, id) => {
+  await deleteDoc(docRef(col, id));
+};
+window._getAll = async (col) => {
+  const snap = await getDocs(colRef(col));
+  const out = {};
+  snap.forEach(d => { out[d.id] = d.data(); });
+  return out;
+};
+</script>
+
+<script>
+// ── STATO ─────────────────────────────────────────────────────────
+let INGREDIENTI = {};   // { id: { nome, categoria, um, costoUnit, scarto, note } }
+let RICETTE = {};       // { id: { nome, categoria, prezzo, porzioni, ingredienti:[{id,qty}] } }
+let FATTURE = {};       // { id: { fornitore, data, numero, totale, righe:[...], associata } }
+let ASSOCIAZIONI = {};  // { key: { descrizione, fornitore, prezzoUnitario, um_fattura, ingId, pezzi, qty, um } }
+
+async function caricaIngredienti() {
+  INGREDIENTI = await window._getAll('ingredienti');
+}
+async function caricaRicette() {
+  RICETTE = await window._getAll('ricette');
+}
+async function caricaFatture() {
+  FATTURE = await window._getAll('fatture');
+}
+async function caricaAssociazioni() {
+  ASSOCIAZIONI = await window._getAll('associazioni');
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function fmt(n) { return n==null||isNaN(n)?'—':new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR',maximumFractionDigits:2}).format(n); }
+function fmtPerc(n) { return n==null||isNaN(n)?'—':n.toFixed(1)+'%'; }
+
+function getCatList(src) {
+  return [...new Set(Object.values(src).map(x=>x.categoria||'').filter(Boolean))].sort();
+}
+
+function calcolaCostoRicetta(ricetta) {
+  if (!ricetta.ingredienti || !ricetta.ingredienti.length) return { costo:0, completo:false };
+  let costo = 0;
+  let completo = true;
+  ricetta.ingredienti.forEach(r => {
+    const ing = INGREDIENTI[r.id];
+    if (!ing || !ing.costoUnit) { completo = false; return; }
+    const scartoFactor = 1 + (ing.scarto||0)/100;
+    costo += (ing.costoUnit * r.qty * scartoFactor) / (ricetta.porzioni||1);
+  });
+  return { costo, completo };
+}
+
+function fcColor(perc) {
+  if (!perc) return 'fc-none';
+  if (perc <= 25) return 'fc-ok';
+  if (perc <= 40) return 'fc-warn';
+  return 'fc-bad';
+}
+
+// ── TABS ──────────────────────────────────────────────────────────
+function switchTab(t) {
+  ['ingredienti','ricette','fatture','associazioni'].forEach(x => {
+    document.getElementById('p-'+x).classList.toggle('active', x===t);
+    document.getElementById('t-'+x).classList.toggle('active', x===t);
+  });
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  document.body.style.overflow = '';
+}
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+// ── INGREDIENTI ───────────────────────────────────────────────────
+function renderIngredienti() {
+  const tbody = document.getElementById('ing-tbody');
+  const empty = document.getElementById('ing-empty');
+  const search = document.getElementById('ing-search').value.toLowerCase();
+  const items = Object.entries(INGREDIENTI);
+
+  // Aggiorna chips categorie
+  const cats = getCatList(INGREDIENTI);
+  const chipsEl = document.getElementById('ing-chips');
+  // (non usiamo chips attivi per semplicità, solo stats)
+
+  // Conta quante ricette usa ogni ingrediente
+  const usatoIn = {};
+  Object.values(RICETTE).forEach(r => {
+    (r.ingredienti||[]).forEach(ri => {
+      usatoIn[ri.id] = (usatoIn[ri.id]||0)+1;
+    });
+  });
+
+  let filtered = items.filter(([,v]) =>
+    !search || (v.nome||'').toLowerCase().includes(search) || (v.categoria||'').toLowerCase().includes(search)
+  );
+  filtered.sort((a,b)=>(a[1].categoria||'').localeCompare(b[1].categoria||'')||a[1].nome.localeCompare(b[1].nome));
+
+  const conCosto = items.filter(([,v])=>v.costoUnit>0).length;
+  document.getElementById('ing-stats').innerHTML =
+    `<div class="stat-item"><div class="stat-label">Totali</div><div class="stat-value">${items.length}</div></div>` +
+    `<div class="stat-item"><div class="stat-label">Con costo</div><div class="stat-value" style="color:var(--green)">${conCosto}</div></div>` +
+    `<div class="stat-item"><div class="stat-label">Senza costo</div><div class="stat-value" style="color:var(--red)">${items.length-conCosto}</div></div>`;
+
+  if (!filtered.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = filtered.map(([id,v]) => `
+    <tr>
+      <td><strong>${v.nome}</strong>${v.note?'<br><span style="font-size:0.68rem;color:var(--text3)">'+v.note+'</span>':''}</td>
+      <td><span class="cat-tag">${v.categoria||'—'}</span></td>
+      <td class="num">${v.costoUnit>0?fmt(v.costoUnit):'<span style="color:var(--red)">N/D</span>'}</td>
+      <td class="num" style="color:var(--text3)">${v.um||'—'}${v.scarto?'<br><span style="font-size:0.65rem">scarto '+v.scarto+'%</span>':''}</td>
+      <td class="num">${usatoIn[id]||0}</td>
+      <td>
+        <div style="display:flex;gap:0.3rem;justify-content:flex-end">
+          <button class="btn" onclick="apriModalIngrediente('${id}')">✏</button>
+          <button class="btn danger" onclick="eliminaIngrediente('${id}')">🗑</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function apriModalIngrediente(id) {
+  const isEdit = !!id;
+  document.getElementById('ing-modal-title').textContent = isEdit ? 'Modifica ingrediente' : 'Nuovo ingrediente';
+  document.getElementById('ing-edit-id').value = id||'';
+  document.getElementById('ing-err').textContent = '';
+  const v = id ? INGREDIENTI[id] : {};
+  document.getElementById('ing-nome').value = v.nome||'';
+  document.getElementById('ing-cat').value = v.categoria||'';
+  document.getElementById('ing-um').value = v.um||'KG';
+  document.getElementById('ing-costo').value = v.costoUnit||'';
+  document.getElementById('ing-scarto').value = v.scarto||0;
+  document.getElementById('ing-note').value = v.note||'';
+  // Popola datalist categorie
+  const dl = document.getElementById('cat-datalist');
+  dl.innerHTML = getCatList(INGREDIENTI).map(c=>`<option value="${c}">`).join('');
+  openModal('ov-ing');
+  setTimeout(()=>document.getElementById('ing-nome').focus(),200);
+}
+
+async function salvaIngrediente() {
+  const id = document.getElementById('ing-edit-id').value || uid();
+  const nome = document.getElementById('ing-nome').value.trim();
+  const err = document.getElementById('ing-err');
+  if (!nome) { err.textContent = 'Inserisci il nome'; return; }
+  const data = {
+    nome,
+    categoria: document.getElementById('ing-cat').value.trim(),
+    um: document.getElementById('ing-um').value,
+    costoUnit: parseFloat(document.getElementById('ing-costo').value)||0,
+    scarto: parseFloat(document.getElementById('ing-scarto').value)||0,
+    note: document.getElementById('ing-note').value.trim(),
+    aggiornato: new Date().toISOString()
+  };
+  try {
+    await window._save('ingredienti', id, data);
+    INGREDIENTI[id] = data;
+    closeModal('ov-ing');
+    renderIngredienti();
+    renderRicette(); // aggiorna food cost
+  } catch(e) { err.textContent = 'Errore: '+e.message; }
+}
+
+async function eliminaIngrediente(id) {
+  const usato = Object.values(RICETTE).some(r=>(r.ingredienti||[]).some(ri=>ri.id===id));
+  if (usato && !confirm('Questo ingrediente è usato in una o più ricette. Eliminare comunque?')) return;
+  if (!confirm('Eliminare questo ingrediente?')) return;
+  await window._del('ingredienti', id);
+  delete INGREDIENTI[id];
+  renderIngredienti();
+  renderRicette();
+}
+
+// ── RICETTE ───────────────────────────────────────────────────────
+function renderRicette() {
+  const grid = document.getElementById('ric-grid');
+  const empty = document.getElementById('ric-empty');
+  const search = document.getElementById('ric-search').value.toLowerCase();
+  const catFilter = document.getElementById('ric-cat-filter').value;
+
+  // Aggiorna select categorie
+  const cats = getCatList(RICETTE);
+  const sel = document.getElementById('ric-cat-filter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Tutte le categorie</option>' +
+    cats.map(c=>`<option value="${c}"${c===cur?'selected':''}>${c.replace(/--/g,'')}</option>`).join('');
+
+  let items = Object.entries(RICETTE);
+  if (search) items = items.filter(([,v])=>(v.nome||'').toLowerCase().includes(search));
+  if (catFilter) items = items.filter(([,v])=>v.categoria===catFilter);
+  items.sort((a,b)=>(a[1].categoria||'').localeCompare(b[1].categoria||'')||a[1].nome.localeCompare(b[1].nome));
+
+  // Stats
+  let totCosto=0, nCompleti=0;
+  Object.values(RICETTE).forEach(r => {
+    const {costo,completo} = calcolaCostoRicetta(r);
+    totCosto+=costo;
+    if(completo) nCompleti++;
+  });
+  document.getElementById('ric-stats').innerHTML =
+    `<div class="stat-item"><div class="stat-label">Ricette</div><div class="stat-value">${Object.keys(RICETTE).length}</div></div>` +
+    `<div class="stat-item"><div class="stat-label">Complete</div><div class="stat-value" style="color:var(--green)">${nCompleti}</div></div>`;
+
+  if (!items.length) {
+    grid.innerHTML=''; empty.style.display='block'; return;
+  }
+  empty.style.display='none';
+
+  grid.innerHTML = items.map(([id,v]) => {
+    const {costo,completo} = calcolaCostoRicetta(v);
+    const prezzo = parseFloat(v.prezzo)||0;
+    const fcPerc = prezzo>0 ? (costo/prezzo*100) : null;
+    const margine = prezzo>0 ? prezzo-costo : null;
+    return `<div class="card" onclick="apriDettaglioRicetta('${id}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="card-name">${v.nome}</div>
+        <button class="btn" style="padding:0.2rem 0.4rem;font-size:0.7rem" onclick="event.stopPropagation();apriModalRicetta('${id}')">✏</button>
+      </div>
+      <div class="card-cat">${(v.categoria||'').replace(/--/g,'').trim()||'—'}</div>
+      ${prezzo>0?`<div class="card-row">Prezzo vendita <span>${fmt(prezzo)}</span></div>`:''}
+      <div class="card-row">Costo ingredienti <span>${completo?fmt(costo):'<span style="color:var(--text3)">incompleto</span>'}</span></div>
+      ${margine!==null?`<div class="card-row">Margine unitario <span style="color:${margine>=0?'var(--green)':'var(--red)'}">${fmt(margine)}</span></div>`:''}
+      ${fcPerc!==null?`<div class="fc-badge ${fcColor(fcPerc)}">Food Cost ${fmtPerc(fcPerc)}</div>`:'<div class="fc-badge fc-none">Prezzo non impostato</div>'}
+      <div style="font-size:0.65rem;color:var(--text3);margin-top:0.5rem">${(v.ingredienti||[]).length} ingredienti</div>
+    </div>`;
+  }).join('');
+}
+
+function apriDettaglioRicetta(id) {
+  const v = RICETTE[id];
+  if (!v) return;
+  const {costo,completo} = calcolaCostoRicetta(v);
+  const prezzo = parseFloat(v.prezzo)||0;
+  const fcPerc = prezzo>0&&completo ? (costo/prezzo*100) : null;
+  const margine = prezzo>0&&completo ? prezzo-costo : null;
+
+  const html = `
+    <div class="modal-title">${v.nome}</div>
+    <div style="text-align:center;margin-bottom:1rem"><span class="cat-tag">${(v.categoria||'').replace(/--/g,'').trim()||'Senza categoria'}</span></div>
+    <div class="detail-kpi">
+      <div class="kpi-card"><div class="kpi-label">Costo ingredienti</div><div class="kpi-val" style="color:var(--accent)">${completo?fmt(costo):'N/D'}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Prezzo vendita</div><div class="kpi-val">${prezzo>0?fmt(prezzo):'—'}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Food Cost %</div><div class="kpi-val ${fcPerc?fcColor(fcPerc):''}">${fcPerc!==null?fmtPerc(fcPerc):'—'}</div></div>
+    </div>
+    ${margine!==null?`<div style="text-align:center;margin-bottom:1rem;font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;color:var(--text3)">Margine unitario: <strong style="color:${margine>=0?'var(--green)':'var(--red)'}">${fmt(margine)}</strong> &nbsp;|&nbsp; Porzioni: ${v.porzioni||1}</div>`:''}
+    <div class="section-title">Ingredienti</div>
+    <table style="width:100%">
+      <thead><tr><th>Ingrediente</th><th class="num">Qtà</th><th>U.M.</th><th class="num">Costo</th></tr></thead>
+      <tbody>
+        ${(v.ingredienti||[]).map(ri => {
+          const ing = INGREDIENTI[ri.id];
+          if (!ing) return '';
+          const scartoF = 1+(ing.scarto||0)/100;
+          const costoRiga = ing.costoUnit ? fmt(ing.costoUnit*ri.qty*scartoF/(v.porzioni||1)) : '<span style="color:var(--red)">N/D</span>';
+          return `<tr><td>${ing.nome}</td><td class="num">${ri.qty}</td><td><span class="cat-tag">${ing.um}</span></td><td class="num">${costoRiga}</td></tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div style="display:flex;gap:0.5rem;margin-top:1rem">
+      <button class="btn primary" onclick="closeModal('ov-ric-detail');apriModalRicetta('${id}')" style="flex:1">✏ Modifica</button>
+      <button class="btn danger" onclick="eliminaRicetta('${id}')" style="flex:1">🗑 Elimina</button>
+    </div>`;
+
+  document.getElementById('ric-detail-content').innerHTML = html;
+  openModal('ov-ric-detail');
+}
+
+function apriModalRicetta(id) {
+  const isEdit = !!id;
+  document.getElementById('ric-modal-title').textContent = isEdit ? 'Modifica ricetta' : 'Nuova ricetta';
+  document.getElementById('ric-edit-id').value = id||'';
+  document.getElementById('ric-err').textContent = '';
+  const v = id ? RICETTE[id] : { ingredienti:[] };
+  document.getElementById('ric-nome').value = v.nome||'';
+  document.getElementById('ric-cat').value = v.categoria||'';
+  document.getElementById('ric-prezzo').value = v.prezzo||'';
+  document.getElementById('ric-porzioni').value = v.porzioni||1;
+  // Popola datalist
+  const dl = document.getElementById('cat-ric-datalist');
+  dl.innerHTML = getCatList(RICETTE).map(c=>`<option value="${c}">`).join('');
+  // Ingredienti
+  window._ricIng = (v.ingredienti||[]).map(x=>({...x}));
+  renderIngListRicetta();
+  openModal('ov-ric');
+  setTimeout(()=>document.getElementById('ric-nome').focus(),200);
+}
+
+function renderIngListRicetta() {
+  const el = document.getElementById('ing-list-ric');
+  el.innerHTML = window._ricIng.map((r,i) => {
+    const ing = INGREDIENTI[r.id];
+    const nome = ing ? ing.nome : '(eliminato)';
+    return `<div class="ing-row" style="margin-bottom:0.4rem">
+      <select class="select" onchange="window._ricIng[${i}].id=this.value;aggiornaCostoRicettaPreview()">
+        <option value="">— Scegli ingrediente —</option>
+        ${Object.entries(INGREDIENTI).sort((a,b)=>a[1].nome.localeCompare(b[1].nome)).map(([id2,v2])=>
+          `<option value="${id2}"${id2===r.id?'selected':''}>${v2.nome} (${v2.um})</option>`
+        ).join('')}
+      </select>
+      <input class="form-input" type="number" step="0.001" min="0" placeholder="Qtà"
+        value="${r.qty||''}" onchange="window._ricIng[${i}].qty=parseFloat(this.value)||0;aggiornaCostoRicettaPreview()">
+      <span style="font-size:0.72rem;color:var(--text3);font-family:'Barlow Condensed',sans-serif;white-space:nowrap">
+        ${ing?ing.um:''}
+      </span>
+      <button class="btn-rm" onclick="window._ricIng.splice(${i},1);renderIngListRicetta();aggiornaCostoRicettaPreview()">✕</button>
+    </div>`;
+  }).join('');
+  aggiornaCostoRicettaPreview();
+}
+
+function aggiungiIngredienteRicetta() {
+  window._ricIng = window._ricIng||[];
+  window._ricIng.push({id:'',qty:0});
+  renderIngListRicetta();
+}
+
+function aggiornaCostoRicettaPreview() {
+  const prezzo = parseFloat(document.getElementById('ric-prezzo').value)||0;
+  const porzioni = parseFloat(document.getElementById('ric-porzioni').value)||1;
+  const temp = { ingredienti: window._ricIng, porzioni };
+  const {costo,completo} = calcolaCostoRicetta(temp);
+  const fcPerc = prezzo>0&&costo>0 ? (costo/prezzo*100) : null;
+  const el = document.getElementById('ric-cost-preview');
+  if (!window._ricIng||!window._ricIng.filter(r=>r.id&&r.qty).length) {
+    el.innerHTML = '<span style="color:var(--text3)">Aggiungi ingredienti per calcolare il food cost</span>';
+    return;
+  }
+  el.innerHTML =
+    `<span style="color:var(--text2)">Costo totale:</span> <strong style="color:var(--accent)">${fmt(costo)}</strong>` +
+    (prezzo>0?` &nbsp;|&nbsp; <span style="color:var(--text2)">Food Cost:</span> <strong class="${fcColor(fcPerc)}">${fmtPerc(fcPerc)}</strong>`:'') +
+    (prezzo>0?` &nbsp;|&nbsp; <span style="color:var(--text2)">Margine:</span> <strong style="color:${prezzo-costo>=0?'var(--green)':'var(--red)'}">${fmt(prezzo-costo)}</strong>`:'') +
+    (!completo?'<br><span style="color:var(--text3);font-size:0.68rem">⚠ Alcuni ingredienti non hanno costo impostato</span>':'');
+}
+
+async function salvaRicetta() {
+  const id = document.getElementById('ric-edit-id').value || uid();
+  const nome = document.getElementById('ric-nome').value.trim();
+  const err = document.getElementById('ric-err');
+  if (!nome) { err.textContent = 'Inserisci il nome'; return; }
+  const data = {
+    nome,
+    categoria: document.getElementById('ric-cat').value.trim(),
+    prezzo: parseFloat(document.getElementById('ric-prezzo').value)||0,
+    porzioni: parseInt(document.getElementById('ric-porzioni').value)||1,
+    ingredienti: (window._ricIng||[]).filter(r=>r.id&&r.qty>0),
+    aggiornato: new Date().toISOString()
+  };
+  try {
+    await window._save('ricette', id, data);
+    RICETTE[id] = data;
+    closeModal('ov-ric');
+    renderRicette();
+  } catch(e) { err.textContent = 'Errore: '+e.message; }
+}
+
+async function eliminaRicetta(id) {
+  if (!confirm('Eliminare questa ricetta?')) return;
+  await window._del('ricette', id);
+  delete RICETTE[id];
+  closeModal('ov-ric-detail');
+  renderRicette();
+}
+
+// ── FATTURE XML ───────────────────────────────────────────────────
+function parseXMLFattura(xmlStr) {
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(xmlStr, 'text/xml');
+  const get = (el, tag) => el.querySelector(tag)?.textContent?.trim()||'';
+
+  const fornitore = get(xml, 'CedentePrestatore Denominazione') ||
+    get(xml, 'CedentePrestatore Nome') + ' ' + get(xml, 'CedentePrestatore Cognome');
+  const data = get(xml, 'DatiGeneraliDocumento Data');
+  const numero = get(xml, 'DatiGeneraliDocumento Numero');
+  const totale = parseFloat(get(xml, 'DatiGeneraliDocumento ImportoTotaleDocumento'))||0;
+  const piva = get(xml, 'CedentePrestatore IdCodice');
+
+  const righe = [];
+  xml.querySelectorAll('DettaglioLinee').forEach(r => {
+    const desc = get(r,'Descrizione');
+    const qty  = parseFloat(get(r,'Quantita'))||1;
+    const um   = get(r,'UnitaMisura')||'PZ';
+    const pu   = parseFloat(get(r,'PrezzoUnitario'))||0;
+    const pt   = parseFloat(get(r,'PrezzoTotale'))||0;
+    const iva  = parseFloat(get(r,'AliquotaIVA'))||0;
+    if (desc && pu>0) righe.push({ desc, qty, um, pu, pt, iva });
+  });
+
+  return { fornitore, data, numero, totale, piva, righe };
+}
+
+async function caricaFattureXML(event) {
+  const files = Array.from(event.target.files);
+  event.target.value = '';
+  for (const file of files) {
+    const text = await file.text();
+    const fat = parseXMLFattura(text);
+    const id = fat.data.replace(/-/g,'')+'_'+fat.numero.replace(/[^a-z0-9]/gi,'_');
+    fat.nomeFile = file.name;
+    fat.caricata = new Date().toISOString();
+    fat.nuoviArticoli = fat.righe.filter(r => !ASSOCIAZIONI[r.desc+'|'+fat.fornitore]).length;
+    await window._save('fatture', id, fat);
+    FATTURE[id] = fat;
+    // Aggiungi articoli non ancora in associazioni
+    fat.righe.forEach(r => {
+      const key = r.desc+'|'+fat.fornitore;
+      if (!ASSOCIAZIONI[key]) {
+        ASSOCIAZIONI[key] = {
+          descrizione: r.desc, fornitore: fat.fornitore, piva: fat.piva,
+          um_fattura: r.um, ultimoPrezzo: r.pu, ultimaQty: r.qty,
+          ingId: null, pezzi:1, qty:1, um:'KG', aggiornato: new Date().toISOString()
+        };
+      } else {
+        // Aggiorna prezzo
+        ASSOCIAZIONI[key].ultimoPrezzo = r.pu;
+        ASSOCIAZIONI[key].ultimaQty = r.qty;
+      }
+    });
+  }
+  // Salva associazioni aggiornate
+  for (const [key, val] of Object.entries(ASSOCIAZIONI)) {
+    await window._save('associazioni', btoa(unescape(encodeURIComponent(key))).replace(/=/g,''), val);
+  }
+  renderFatture();
+  renderAssociazioni();
+  // Ricalcola costi ingredienti
+  aggiornaCostiDaAssociazioni();
+}
+
+function renderFatture() {
+  const list = document.getElementById('fat-list');
+  const empty = document.getElementById('fat-empty');
+  const search = document.getElementById('fat-search').value.toLowerCase();
+  let items = Object.entries(FATTURE).sort((a,b)=>b[1].data.localeCompare(a[1].data));
+  if (search) items = items.filter(([,v])=>(v.fornitore||'').toLowerCase().includes(search));
+
+  const totFornitori = new Set(Object.values(FATTURE).map(f=>f.fornitore)).size;
+  const totImporto = Object.values(FATTURE).reduce((s,f)=>s+f.totale,0);
+  document.getElementById('fat-stats').innerHTML =
+    `<div class="stat-item"><div class="stat-label">Fatture</div><div class="stat-value">${Object.keys(FATTURE).length}</div></div>` +
+    `<div class="stat-item"><div class="stat-label">Fornitori</div><div class="stat-value">${totFornitori}</div></div>` +
+    `<div class="stat-item"><div class="stat-label">Importo totale</div><div class="stat-value">${fmt(totImporto)}</div></div>`;
+
+  if (!items.length) { list.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+
+  list.innerHTML = items.map(([id,f]) => {
+    const daAssociare = f.righe ? f.righe.filter(r=>!ASSOCIAZIONI[r.desc+'|'+f.fornitore]?.ingId).length : 0;
+    return `<div class="fattura-card" onclick="apriDettaglioFattura('${id}')">
+      <div class="fattura-header">
+        <div>
+          <div class="fattura-fornitore">${f.fornitore}</div>
+          <div class="fattura-meta">${f.data} &nbsp;·&nbsp; n. ${f.numero} &nbsp;·&nbsp; ${f.righe?.length||0} articoli</div>
+        </div>
+        <div style="text-align:right">
+          <div class="fattura-totale">${fmt(f.totale)}</div>
+          ${daAssociare>0?`<span class="badge-new">${daAssociare} da associare</span>`:'<span class="badge-ok">✓ Completa</span>'}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function apriDettaglioFattura(id) {
+  const f = FATTURE[id];
+  if (!f) return;
+  // Vai al tab associazioni e filtra per fornitore
+  switchTab('associazioni');
+  document.getElementById('ass-search').value = f.fornitore;
+  renderAssociazioni();
+}
+
+// ── ASSOCIAZIONI ──────────────────────────────────────────────────
+function renderAssociazioni() {
+  const list = document.getElementById('ass-list');
+  const empty = document.getElementById('ass-empty');
+  const search = document.getElementById('ass-search').value.toLowerCase();
+  const filter = document.getElementById('ass-filter').value;
+
+  let items = Object.entries(ASSOCIAZIONI);
+  if (search) items = items.filter(([,v])=>(v.descrizione||'').toLowerCase().includes(search)||(v.fornitore||'').toLowerCase().includes(search));
+  if (filter==='da_associare') items = items.filter(([,v])=>!v.ingId);
+  if (filter==='associati') items = items.filter(([,v])=>!!v.ingId);
+  items.sort((a,b)=>(a[1].ingId?1:0)-(b[1].ingId?1:0)||(a[1].fornitore||'').localeCompare(b[1].fornitore||'')||a[1].descrizione.localeCompare(b[1].descrizione));
+
+  const daFare = Object.values(ASSOCIAZIONI).filter(v=>!v.ingId).length;
+  document.getElementById('ass-stats').innerHTML =
+    `<div class="stat-item"><div class="stat-label">Totali</div><div class="stat-value">${Object.keys(ASSOCIAZIONI).length}</div></div>` +
+    `<div class="stat-item"><div class="stat-label">Da associare</div><div class="stat-value" style="color:${daFare>0?'var(--red)':'var(--green)'}">${daFare}</div></div>` +
+    `<div class="stat-item"><div class="stat-label">Associati</div><div class="stat-value" style="color:var(--green)">${Object.keys(ASSOCIAZIONI).length-daFare}</div></div>`;
+
+  if (!items.length) { list.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+
+  list.innerHTML = items.map(([storageId,v]) => {
+    const ing = v.ingId ? INGREDIENTI[v.ingId] : null;
+    const costoPerUm = v.ingId && ing ? fmt(ing.costoUnit)+'/'+ing.um : null;
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:0.8rem 1rem;margin-bottom:0.5rem">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.4rem">
+        <div>
+          <div style="font-weight:700;font-size:0.88rem">${v.descrizione}</div>
+          <div style="font-size:0.7rem;color:var(--text3)">${v.fornitore} &nbsp;·&nbsp; Ultimo prezzo: ${fmt(v.ultimoPrezzo)} &nbsp;·&nbsp; ${v.ultimaQty||1} ${v.um_fattura||'PZ'}</div>
+        </div>
+        <div style="display:flex;gap:0.4rem;align-items:center">
+          ${ing?`<span class="cat-tag">${ing.nome}</span><span style="font-size:0.7rem;color:var(--text3)">${costoPerUm||''}</span>`:'<span style="font-size:0.72rem;color:var(--red)">Non associato</span>'}
+          <button class="btn ${v.ingId?'':'primary'}" onclick="apriModalAssociazione('${storageId}')">
+            ${v.ingId?'✏':'+ Associa'}
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function apriModalAssociazione(storageId) {
+  const v = ASSOCIAZIONI[storageId];
+  if (!v) return;
+  document.getElementById('ass-edit-key').value = storageId;
+  document.getElementById('ass-err').textContent = '';
+  document.getElementById('ass-articolo-nome').textContent = v.descrizione;
+  document.getElementById('ass-articolo-meta').textContent = v.fornitore+' · '+fmt(v.ultimoPrezzo)+' · '+v.ultimaQty+' '+v.um_fattura;
+  const ing = v.ingId ? INGREDIENTI[v.ingId] : null;
+  document.getElementById('ass-ing-search').value = ing ? ing.nome : '';
+  document.getElementById('ass-ing-id').value = v.ingId||'';
+  document.getElementById('ass-pezzi').value = v.pezzi||1;
+  document.getElementById('ass-qty').value = v.qty||1;
+  document.getElementById('ass-um').value = v.um||'KG';
+  document.getElementById('ass-ing-suggestions').style.display='none';
+  aggiornaPreviewAssoc();
+  openModal('ov-ass');
+  setTimeout(()=>document.getElementById('ass-ing-search').focus(),200);
+}
+
+function cercaIngredienteAssoc(val) {
+  const sug = document.getElementById('ass-ing-suggestions');
+  if (!val || val.length<2) { sug.style.display='none'; return; }
+  const matches = Object.entries(INGREDIENTI)
+    .filter(([,v])=>v.nome.toLowerCase().includes(val.toLowerCase()))
+    .slice(0,8);
+  if (!matches.length) { sug.style.display='none'; return; }
+  sug.style.display='block';
+  sug.innerHTML = matches.map(([id,v])=>
+    `<div onclick="selezionaIngAssoc('${id}','${v.nome}')" style="padding:0.5rem 0.8rem;cursor:pointer;font-size:0.85rem;border-bottom:1px solid var(--border)" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''">${v.nome} <span style="color:var(--text3);font-size:0.72rem">${v.um} · ${fmt(v.costoUnit)}</span></div>`
+  ).join('') +
+  `<div onclick="creaIngredienteDaAssoc('${val}')" style="padding:0.5rem 0.8rem;cursor:pointer;font-size:0.82rem;color:var(--accent);border-top:1px solid var(--border)">+ Crea "${val}" come nuovo ingrediente</div>`;
+}
+
+function selezionaIngAssoc(id, nome) {
+  document.getElementById('ass-ing-id').value = id;
+  document.getElementById('ass-ing-search').value = nome;
+  document.getElementById('ass-ing-suggestions').style.display='none';
+  aggiornaPreviewAssoc();
+}
+
+function creaIngredienteDaAssoc(nome) {
+  document.getElementById('ass-ing-suggestions').style.display='none';
+  closeModal('ov-ass');
+  apriModalIngrediente();
+  document.getElementById('ing-nome').value = nome;
+  document.getElementById('ass-ing-search').dataset.pendingNome = nome;
+}
+
+function aggiornaPreviewAssoc() {
+  const v = ASSOCIAZIONI[document.getElementById('ass-edit-key').value];
+  if (!v) return;
+  const pezzi = parseFloat(document.getElementById('ass-pezzi').value)||1;
+  const qty = parseFloat(document.getElementById('ass-qty').value)||1;
+  const um = document.getElementById('ass-um').value;
+  const costoTotale = v.ultimoPrezzo * v.ultimaQty; // costo per collo
+  const totUm = qty * pezzi;
+  const costoPer = totUm>0 ? costoTotale/totUm : 0;
+  const el = document.getElementById('ass-costo-preview');
+  el.innerHTML = totUm>0
+    ? `Costo calcolato: <strong style="color:var(--accent)">${fmt(costoPer)} / ${um}</strong> &nbsp;(${fmt(costoTotale)} ÷ ${totUm} ${um})`
+    : '';
+}
+
+document.getElementById('ass-pezzi').addEventListener('input', aggiornaPreviewAssoc);
+document.getElementById('ass-qty').addEventListener('input', aggiornaPreviewAssoc);
+document.getElementById('ass-um').addEventListener('change', aggiornaPreviewAssoc);
+
+async function salvaAssociazione() {
+  const storageId = document.getElementById('ass-edit-key').value;
+  const ingId = document.getElementById('ass-ing-id').value;
+  const err = document.getElementById('ass-err');
+  if (!ingId) { err.textContent = 'Seleziona o crea un ingrediente'; return; }
+  const v = ASSOCIAZIONI[storageId];
+  if (!v) return;
+  const pezzi = parseFloat(document.getElementById('ass-pezzi').value)||1;
+  const qty = parseFloat(document.getElementById('ass-qty').value)||1;
+  const um = document.getElementById('ass-um').value;
+  // Calcola costo per unità base
+  const costoTotale = v.ultimoPrezzo * v.ultimaQty;
+  const totUm = qty * pezzi;
+  const costoPerUm = totUm>0 ? costoTotale/totUm : 0;
+
+  const updated = { ...v, ingId, pezzi, qty, um, costoPerUm, aggiornato: new Date().toISOString() };
+  try {
+    await window._save('associazioni', storageId, updated);
+    ASSOCIAZIONI[storageId] = updated;
+    // Aggiorna costo ingrediente
+    if (INGREDIENTI[ingId]) {
+      INGREDIENTI[ingId].costoUnit = costoPerUm;
+      INGREDIENTI[ingId].um = um;
+      await window._save('ingredienti', ingId, INGREDIENTI[ingId]);
+    }
+    closeModal('ov-ass');
+    renderAssociazioni();
+    renderIngredienti();
+    renderRicette();
+  } catch(e) { err.textContent = 'Errore: '+e.message; }
+}
+
+async function aggiornaCostiDaAssociazioni() {
+  for (const [,assoc] of Object.entries(ASSOCIAZIONI)) {
+    if (!assoc.ingId || !assoc.costoPerUm) continue;
+    const ing = INGREDIENTI[assoc.ingId];
+    if (ing && Math.abs(ing.costoUnit - assoc.costoPerUm) > 0.001) {
+      ing.costoUnit = assoc.costoPerUm;
+      ing.um = assoc.um;
+      await window._save('ingredienti', assoc.ingId, ing);
+    }
+  }
+  renderIngredienti();
+  renderRicette();
+}
+</script>
+</body>
+</html>
