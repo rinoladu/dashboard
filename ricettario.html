@@ -539,6 +539,7 @@ onAuthStateChanged(auth, async user => {
 
   // Carica tutto
   await Promise.all([caricaIngredienti(), caricaRicette(), caricaFatture(), caricaAssociazioni()]);
+  initAliasMap(); // costruisce e salva la mappa alias su Firestore
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   renderIngredienti();
@@ -822,6 +823,18 @@ function apriDettaglioRicetta(id) {
         }).join('')}
       </tbody>
     </table>
+    <hr class="divider">
+    <div class="section-title">Alias prodotto (nomi nella chiusura)</div>
+    <div style="font-size:0.75rem;color:var(--text3);margin-bottom:0.6rem">
+      Aggiungi i nomi esatti con cui questo piatto appare nelle chiusure Excel (es. SPRITZ APEROL, Spritz Aperol Special...)
+    </div>
+    <div id="alias-list-${id}" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.5rem">
+      ${(v.alias||[]).map(a=>`<span style="background:rgba(232,184,75,0.12);border:1px solid rgba(232,184,75,0.3);color:var(--accent);border-radius:6px;padding:0.2rem 0.6rem;font-size:0.75rem;font-family:'Barlow Condensed',sans-serif;cursor:pointer" onclick="rimuoviAlias('${id}','${a}')">${a} ✕</span>`).join('')}
+    </div>
+    <div style="display:flex;gap:0.4rem">
+      <input class="form-input" id="alias-input-${id}" placeholder="Aggiungi alias..." style="flex:1;padding:0.4rem 0.7rem;font-size:0.82rem">
+      <button class="btn primary" onclick="aggiungiAlias('${id}')">+ Aggiungi</button>
+    </div>
     <div style="display:flex;gap:0.5rem;margin-top:1rem">
       <button class="btn primary" onclick="closeModal('ov-ric-detail');apriModalRicetta('${id}')" style="flex:1">✏ Modifica</button>
       <button class="btn danger" onclick="eliminaRicetta('${id}')" style="flex:1">🗑 Elimina</button>
@@ -1174,6 +1187,79 @@ async function salvaAssociazione() {
     renderIngredienti();
     renderRicette();
   } catch(e) { err.textContent = 'Errore: '+e.message; }
+}
+
+// ── ALIAS PRODOTTO→RICETTA ───────────────────────────────────────
+async function aggiungiAlias(ricettaId) {
+  const input = document.getElementById('alias-input-'+ricettaId);
+  const alias = (input.value||'').trim();
+  if (!alias) return;
+  const v = RICETTE[ricettaId];
+  if (!v) return;
+  const aliases = v.alias || [];
+  if (aliases.includes(alias)) { input.value=''; return; }
+  aliases.push(alias);
+  v.alias = aliases;
+  await window._save('ricette', ricettaId, v);
+  RICETTE[ricettaId] = v;
+  input.value = '';
+  // Aggiorna la lista alias nel modal senza richiuderlo
+  const listEl = document.getElementById('alias-list-'+ricettaId);
+  if (listEl) {
+    listEl.innerHTML = aliases.map(a =>
+      `<span style="background:rgba(232,184,75,0.12);border:1px solid rgba(232,184,75,0.3);color:var(--accent);border-radius:6px;padding:0.2rem 0.6rem;font-size:0.75rem;font-family:'Barlow Condensed',sans-serif;cursor:pointer" onclick="rimuoviAlias('${ricettaId}','${a}')">${a} ✕</span>`
+    ).join('');
+  }
+  // Aggiorna mappa alias globale
+  costruisciMappaAlias();
+}
+
+async function rimuoviAlias(ricettaId, alias) {
+  const v = RICETTE[ricettaId];
+  if (!v) return;
+  v.alias = (v.alias||[]).filter(a => a !== alias);
+  await window._save('ricette', ricettaId, v);
+  RICETTE[ricettaId] = v;
+  const listEl = document.getElementById('alias-list-'+ricettaId);
+  if (listEl) {
+    listEl.innerHTML = v.alias.map(a =>
+      `<span style="background:rgba(232,184,75,0.12);border:1px solid rgba(232,184,75,0.3);color:var(--accent);border-radius:6px;padding:0.2rem 0.6rem;font-size:0.75rem;font-family:'Barlow Condensed',sans-serif;cursor:pointer" onclick="rimuoviAlias('${ricettaId}','${a}')">${a} ✕</span>`
+    ).join('');
+  }
+  costruisciMappaAlias();
+}
+
+// Mappa flat: nomeProdotto.toUpperCase() → { costoUnit, ricettaId, nomeRicetta }
+let ALIAS_MAP = {};
+
+function costruisciMappaAlias() {
+  ALIAS_MAP = {};
+  Object.entries(RICETTE).forEach(([id, v]) => {
+    const {costo} = calcolaCostoRicetta(v);
+    // Aggiungi il nome della ricetta stessa
+    if (v.nome) ALIAS_MAP[v.nome.toUpperCase().trim()] = { costoUnit: costo, ricettaId: id, nomeRicetta: v.nome };
+    // Aggiungi tutti gli alias
+    (v.alias||[]).forEach(a => {
+      ALIAS_MAP[a.toUpperCase().trim()] = { costoUnit: costo, ricettaId: id, nomeRicetta: v.nome };
+    });
+  });
+  // Salva su Firestore come documento accessibile dalla dashboard
+  salvaAliasMap();
+}
+
+async function salvaAliasMap() {
+  try {
+    const { doc, setDoc } = window._fs;
+    await setDoc(
+      doc(window._db, 'ricettario', window._uid, 'config', 'alias_map'),
+      { map: ALIAS_MAP, aggiornato: new Date().toISOString() }
+    );
+  } catch(e) { console.error('salvaAliasMap:', e); }
+}
+
+// Chiamata all'avvio dopo aver caricato le ricette
+function initAliasMap() {
+  costruisciMappaAlias();
 }
 
 async function aggiornaCostiDaAssociazioni() {

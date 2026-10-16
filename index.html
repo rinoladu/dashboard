@@ -773,6 +773,7 @@ body.light .emoji-btn { background: #e8eaed; }
   <div class="locale-header">
     <div class="app-logo" id="locale-logo">Dashboard</div>
     <div class="home-actions">
+      <a href="ricettario.html" class="btn-sm" style="text-decoration:none" title="Ricettario">🍽 <span class="btn-label">Ricettario</span></a>
       <button class="btn-sm btn-theme" onclick="toggleTheme()" id="btn-theme-locale" title="Cambia tema">🌙</button>
       <button class="btn-sm logout" onclick="logoutUtente()">👤 <span class="btn-label">Esci</span></button>
     </div>
@@ -1495,6 +1496,8 @@ function subscribeToData(localeId) {
     setSyncStatus('synced', 'Sincronizzato');
     // Carica food cost per questo locale
     fcCarica().then(() => { if (document.getElementById('panel-foodcost')?.style.display !== 'none') renderFoodCostTable(); });
+    // Carica mappa ricettario (comune a tutti i locali)
+    caricaRicettarioMap();
     // Svuota pannello previsioni (dati nuovo locale)
     const prevBody = document.getElementById('previsioni-body');
     if (prevBody) prevBody.innerHTML = '<div style="font-size:0.75rem;color:var(--text3)">Premi “✦ Genera” per ottenere una proiezione basata sui dati di questo locale.</div>';
@@ -2263,11 +2266,21 @@ function parseWorkbook(wb, filename, periodo, mese=null) {
       item.margineEuro = item._margine;
     } else {
       const fd = result.foodDrinkCost[k];
-      item.costoUnit = fd ? fd.costoUnit : 0;
-      item.costoTot  = item.costoUnit * item.qty;
+      // Priorità costi: 1) Ricettario, 2) Food Cost tab (FC), 3) File Excel
+      const daRicettario = costoUnitarioDaRicettario(item.prodotto);
+      if (daRicettario && daRicettario.costoUnit > 0) {
+        item.costoUnit = daRicettario.costoUnit;
+        item.fonteConsto = 'ricettario';
+      } else {
+        item.costoUnit = fd ? fd.costoUnit : 0;
+        item.fonteConsto = item.costoUnit > 0 ? 'excel' : '';
+        if (item.costoUnit === 0) {
+          fcApplicaAItem(item); // prova dal Food Cost tab
+          if (item.costoUnit > 0) item.fonteConsto = 'foodcost';
+        }
+      }
+      item.costoTot    = item.costoUnit * item.qty;
       item.margineEuro = item.costoTot === 0 ? item.imponibile : item.imponibile - item.costoTot;
-      // Applica listino centrale se il file non ha il costo
-      if (item.costoUnit === 0) fcApplicaAItem(item);
     }
     item.marginePerc=item.imponibile>0?(item.margineEuro/item.imponibile)*100:0;
     // Pulisci campi temporanei
@@ -3570,6 +3583,28 @@ function closeObiettivoModalOutside(e) {
 // users/{adminUid}/locali/{localeId}/foodcost/listino
 let FC = {};          // listino attivo
 let FC_locale = null; // locale per cui è caricato
+let RICETTARIO_MAP = {}; // alias prodotto→costo dal ricettario { NOME_UPPER: { costoUnit, nomeRicetta } }
+
+async function caricaRicettarioMap() {
+  try {
+    const adminUid = localStorage.getItem('ego_admin_uid') || window._adminUid;
+    if (!adminUid || !window._db) return;
+    const { doc, getDoc } = window._firestore;
+    // La mappa è salvata sotto l'uid dell'admin (stesso account Google)
+    const snap = await getDoc(doc(window._db, 'ricettario', adminUid, 'config', 'alias_map'));
+    if (snap.exists()) {
+      RICETTARIO_MAP = snap.data().map || {};
+      console.log('Ricettario caricato:', Object.keys(RICETTARIO_MAP).length, 'prodotti');
+    }
+  } catch(e) {
+    console.error('caricaRicettarioMap:', e);
+  }
+}
+
+function costoUnitarioDaRicettario(nomeProdotto) {
+  const key = (nomeProdotto||'').toUpperCase().trim();
+  return RICETTARIO_MAP[key] || null;
+}
 
 // ── Carica da Firestore ──────────────────────────────────────────
 async function fcCarica() {
@@ -3876,7 +3911,12 @@ async function salvaFoodCost() {
 }
 
 async function ricalcolaChiusure() {
-  if (!Object.keys(FC).length) { alert('Nessun food cost caricato.'); return; }
+  const hasFC = Object.keys(FC).length > 0;
+  const hasRicettario = Object.keys(RICETTARIO_MAP).length > 0;
+  if (!hasFC && !hasRicettario) {
+    alert('Nessun food cost caricato. Usa il Ricettario o il tab Food Cost.');
+    return;
+  }
   const btn = document.getElementById('btn-fc-ricalcola');
   if (btn) { btn.textContent = '⏳ Ricalcolo...'; btn.disabled = true; }
   let aggiornate = 0;
@@ -3885,14 +3925,19 @@ async function ricalcolaChiusure() {
       let modificato = false;
       chiusura.chiusura.forEach(item => {
         const k = String(Math.round(parseFloat(item.cod)));
+        // Priorità: 1) Ricettario, 2) Food Cost tab
+        const daRicettario = costoUnitarioDaRicettario(item.prodotto);
         const fc = FC[k];
-        if (fc && fc.costoUnit > 0) {
+        const nuovoCosto = (daRicettario && daRicettario.costoUnit > 0)
+          ? daRicettario.costoUnit
+          : (fc && fc.costoUnit > 0 ? fc.costoUnit : null);
+        if (nuovoCosto !== null) {
           const vecchio = item.costoUnit;
-          item.costoUnit   = fc.costoUnit;
-          item.costoTot    = fc.costoUnit * item.qty;
+          item.costoUnit   = nuovoCosto;
+          item.costoTot    = nuovoCosto * item.qty;
           item.margineEuro = item.imponibile - item.costoTot;
           item.marginePerc = item.imponibile > 0 ? (item.margineEuro / item.imponibile) * 100 : 0;
-          if (vecchio !== fc.costoUnit) modificato = true;
+          if (vecchio !== nuovoCosto) modificato = true;
         }
       });
       if (modificato) {
