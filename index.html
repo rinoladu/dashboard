@@ -3592,7 +3592,7 @@ async function caricaRicettarioMap() {
     const { doc, getDoc } = window._firestore;
     // La mappa è salvata sotto l'uid dell'admin (stesso account Google)
     const localeId = window.currentLocaleId || 'default';
-    const snap = await getDoc(doc(window._db, 'ricettario', adminUid, localeId, 'config', 'alias_map'));
+    const snap = await getDoc(doc(window._db, 'ricettario', adminUid, 'locali', localeId, 'config', 'alias_map'));
     if (snap.exists()) {
       RICETTARIO_MAP = snap.data().map || {};
       console.log('Ricettario caricato:', Object.keys(RICETTARIO_MAP).length, 'prodotti');

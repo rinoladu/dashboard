@@ -605,8 +605,8 @@ window.cambiaLocaleRic = () => {
   document.getElementById('locale-screen').style.display = 'flex';
 };
 
-const colRef = (col) => collection(db, 'ricettario', window._uid, window._localeId, col);
-const docRef = (col, id) => doc(db, 'ricettario', window._uid, window._localeId, col, id);
+const colRef = (col) => collection(db, 'ricettario', window._uid, 'locali', window._localeId, col);
+const docRef = (col, id) => doc(db, 'ricettario', window._uid, 'locali', window._localeId, col, id);
 
 window._save = async (col, id, data) => {
   await setDoc(docRef(col, id), data);
@@ -1307,7 +1307,7 @@ async function salvaAliasMap() {
   try {
     const { doc, setDoc } = window._fs;
     await setDoc(
-      doc(window._db, 'ricettario', window._uid, window._localeId, 'config', 'alias_map'),
+      doc(window._db, 'ricettario', window._uid, 'locali', window._localeId, 'config', 'alias_map'),
       { map: ALIAS_MAP, aggiornato: new Date().toISOString() }
     );
   } catch(e) { console.error('salvaAliasMap:', e); }
