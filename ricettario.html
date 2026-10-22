@@ -225,6 +225,19 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div style="color:var(--red);font-size:0.78rem" id="login-err"></div>
 </div>
 
+<!-- SELEZIONE LOCALE -->
+<div id="locale-screen" style="display:none;flex-direction:column;min-height:100vh">
+  <div style="background:rgba(14,17,26,0.95);border-bottom:1px solid var(--border);padding:0.8rem 1.2rem;display:flex;align-items:center;justify-content:space-between">
+    <div><div class="logo">Ricettario</div><div class="logo-sub">Seleziona locale</div></div>
+    <button class="btn danger" onclick="logout()">Esci</button>
+  </div>
+  <div style="padding:1.5rem 1.2rem 0.5rem">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:0.75rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--text3);margin-bottom:0.3rem">Scegli il locale</div>
+    <div style="font-size:0.85rem;color:var(--text2)">I dati sono separati per ogni locale</div>
+  </div>
+  <div id="locale-grid-ric" style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;padding:1.2rem"></div>
+</div>
+
 <!-- LOADING -->
 <div id="loading">
   <div class="spinner"></div>
@@ -241,6 +254,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div style="display:flex;gap:0.5rem;align-items:center">
       <div id="locale-badge" style="font-size:0.7rem;color:var(--text3);font-family:'Barlow Condensed',sans-serif;letter-spacing:0.08em;text-transform:uppercase"></div>
       <a href="index.html" class="btn" style="text-decoration:none">← Dashboard</a>
+      <button class="btn" onclick="cambiaLocaleRic()">⇄ Locale</button>
       <button class="btn danger" onclick="logout()">Esci</button>
     </div>
   </div>
@@ -535,22 +549,64 @@ onAuthStateChanged(auth, async user => {
   document.getElementById('loading').style.display = 'flex';
   window._uid = user.uid;
   window._userEmail = user.email;
-  document.getElementById('locale-badge').textContent = user.email;
 
-  // Carica tutto
-  await Promise.all([caricaIngredienti(), caricaRicette(), caricaFatture(), caricaAssociazioni()]);
-  initAliasMap(); // costruisce e salva la mappa alias su Firestore
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  renderIngredienti();
-  renderRicette();
-  renderFatture();
-  renderAssociazioni();
+  // Carica locali dalla dashboard (stesso Firebase)
+  try {
+    const snap = await getDocs(collection(db, 'users', user.uid, 'locali_config'));
+    let locali = [];
+    if (!snap.empty) {
+      snap.forEach(d => locali.push({ id: d.id, ...d.data() }));
+      locali.sort((a,b) => (a.ordine||0)-(b.ordine||0));
+    } else {
+      locali = [
+        {id:'ego',nome:'EGO',icona:'⭐'},
+        {id:'kings',nome:'Kings',icona:'👑'},
+        {id:'rio',nome:'Rio',icona:'🌊'},
+        {id:'park_village',nome:'Park Village',icona:'🌳'},
+        {id:'embarcadero',nome:'Embarcadero',icona:'⚓'},
+      ];
+    }
+    window._locali = locali;
+    const grid = document.getElementById('locale-grid-ric');
+    grid.innerHTML = locali.map(l => `
+      <div onclick="selezionaLocaleRic('${l.id}','${l.nome}')" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.5rem 1rem;cursor:pointer;text-align:center;transition:all 0.3s" onmouseover="this.style.borderColor='rgba(232,184,75,0.4)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:2rem;margin-bottom:0.5rem">${l.icona||'🍽'}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:800">${l.nome}</div>
+      </div>`).join('');
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('locale-screen').style.display = 'flex';
+  } catch(e) {
+    console.error(e);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('locale-screen').style.display = 'flex';
+  }
 });
 
 // ── FIRESTORE HELPERS ──────────────────────────────────────────────
-const colRef = (col) => collection(db, 'ricettario', window._uid, col);
-const docRef = (col, id) => doc(db, 'ricettario', window._uid, col, id);
+window._localeId = null;
+
+window.selezionaLocaleRic = async (localeId, localeNome) => {
+  window._localeId = localeId;
+  document.getElementById('locale-screen').style.display = 'none';
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('locale-badge').textContent = localeNome;
+  const sub = document.querySelector('.logo-sub');
+  if (sub) sub.textContent = localeNome;
+  await Promise.all([caricaIngredienti(), caricaRicette(), caricaFatture(), caricaAssociazioni()]);
+  initAliasMap();
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  renderIngredienti(); renderRicette(); renderFatture(); renderAssociazioni();
+};
+
+window.cambiaLocaleRic = () => {
+  INGREDIENTI={}; RICETTE={}; FATTURE={}; ASSOCIAZIONI={}; ALIAS_MAP={};
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('locale-screen').style.display = 'flex';
+};
+
+const colRef = (col) => collection(db, 'ricettario', window._uid, window._localeId, col);
+const docRef = (col, id) => doc(db, 'ricettario', window._uid, window._localeId, col, id);
 
 window._save = async (col, id, data) => {
   await setDoc(docRef(col, id), data);
@@ -1251,7 +1307,7 @@ async function salvaAliasMap() {
   try {
     const { doc, setDoc } = window._fs;
     await setDoc(
-      doc(window._db, 'ricettario', window._uid, 'config', 'alias_map'),
+      doc(window._db, 'ricettario', window._uid, window._localeId, 'config', 'alias_map'),
       { map: ALIAS_MAP, aggiornato: new Date().toISOString() }
     );
   } catch(e) { console.error('salvaAliasMap:', e); }
