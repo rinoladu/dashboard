@@ -3393,6 +3393,32 @@ function renderPrevisioni(r) {
   `;
 }
 
+// Break even mensile automatico (lordo), robusto: usa la media delle ultime
+// chiusure giornaliere invece di una sola chiusura, così un giorno anomalo
+// non fa esplodere il risultato.
+function calcolaBreakEvenAuto(annoRif, meseRif) {
+  const giorniMese = new Date(annoRif, meseRif + 1, 0).getDate();
+  // 1) Chiusura mensile con costi (già aggregata)
+  const mensile = CHIUSURE.find(c => (c.tipo || '') === 'mese' && c.costiGiorn > 0);
+  if (mensile) {
+    const lordo = (mensile.totImponibile || 0) * 1.10;
+    const perc = lordo > 0 ? mensile.totMargine / lordo : 0;
+    if (perc >= 0.05) return mensile.costiGiorn / perc;
+  }
+  // 2) Media delle ultime 30 giornaliere con costi
+  const campione = CHIUSURE
+    .filter(c => (c.tipo || 'giorno') === 'giorno' && c.costiGiorn > 0)
+    .slice(0, 30);
+  if (campione.length < 3) return 0;
+  const costiMedi = campione.reduce((s, c) => s + c.costiGiorn, 0) / campione.length;
+  const totLordo = campione.reduce((s, c) => s + (c.totLordo || (c.totImponibile || 0) * 1.10), 0);
+  const totMarg = campione.reduce((s, c) => s + (c.totMargine || 0), 0);
+  const perc = totLordo > 0 ? totMarg / totLordo : 0;
+  // Margine sotto il 5% = dati non affidabili: meglio nessun valore che uno assurdo
+  if (perc < 0.05) return 0;
+  return (costiMedi * giorniMese) / perc;
+}
+
 function aggiornaWidgetObiettivo() {
   const widget = document.getElementById('obiettivo-widget');
   if (!widget) return;
@@ -3415,19 +3441,7 @@ function aggiornaWidgetObiettivo() {
   const incassatoMese = chiusureMese.reduce((s, c) => s + (c.totLordo || (c.totImponibile||0)*1.10), 0);
 
   // Suggerimento automatico dal break even dell'ultima mensile
-  // Cerca prima una mensile con costi, poi qualsiasi chiusura con costi
-  const ultimaMensile = CHIUSURE.find(c => (c.tipo || '') === 'mese' && c.costiGiorn > 0)
-    || CHIUSURE.find(c => c.costiGiorn > 0);
-  let breakEvenAuto = 0;
-  if (ultimaMensile && ultimaMensile.costiGiorn > 0) {
-    const giorniMeseRif = new Date(annoCorrente, meseCorrente + 1, 0).getDate();
-    const costiMensili = (ultimaMensile.tipo === 'mese')
-      ? ultimaMensile.costiGiorn
-      : ultimaMensile.costiGiorn * giorniMeseRif;
-    const lordoRif = (ultimaMensile.totImponibile || 0) * 1.10;
-    const percMarg = lordoRif > 0 ? ultimaMensile.totMargine / lordoRif : 0;
-    if (percMarg > 0) breakEvenAuto = costiMensili / percMarg;
-  }
+  const breakEvenAuto = calcolaBreakEvenAuto(annoCorrente, meseCorrente);
 
   // Target: usa quello salvato, o auto, o 0
   const target = obiettivo > 0 ? obiettivo : breakEvenAuto;
@@ -3513,24 +3527,13 @@ function apriImpostazioniObiettivo() {
   const attuale = getObiettivoSalvato();
   document.getElementById('obiettivo-input').value = attuale > 0 ? attuale : '';
 
-  // Suggerimento automatico
-  const ultimaMensile = CHIUSURE.find(c => (c.tipo || '') === 'mese' && c.costiGiorn > 0)
-    || CHIUSURE.find(c => c.costiGiorn > 0);
+  // Suggerimento automatico (stesso calcolo del widget)
   const sugEl = document.getElementById('obiettivo-suggerimento');
-  if (ultimaMensile && ultimaMensile.costiGiorn > 0) {
-    const giorniMeseM = new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate();
-    const costiMensiliM = (ultimaMensile.tipo === 'mese')
-      ? ultimaMensile.costiGiorn
-      : ultimaMensile.costiGiorn * giorniMeseM;
-    const percMarg = ultimaMensile.totImponibile > 0 ? ultimaMensile.totMargine / ultimaMensile.totImponibile : 0;
-    if (percMarg > 0) {
-      const bep = costiMensiliM / percMarg;
-      sugEl.innerHTML = "💡 Break even calcolato dall'ultima mensile: <strong style='color:var(--accent)'>" + fmt(bep) + '</strong>';
-    } else {
-      sugEl.textContent = '';
-    }
+  const bepSug = calcolaBreakEvenAuto(new Date().getFullYear(), new Date().getMonth());
+  if (bepSug > 0) {
+    sugEl.innerHTML = "💡 Break even stimato dalle ultime chiusure: <strong style='color:var(--accent)'>" + fmt(bepSug) + '</strong>';
   } else {
-    sugEl.textContent = 'Carica una chiusura mensile per il suggerimento automatico.';
+    sugEl.textContent = 'Dati insufficienti per il suggerimento automatico.';
   }
 
   // Mostra chiave API salvata (mascherata)
