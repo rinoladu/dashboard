@@ -338,7 +338,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <button class="btn" onclick="document.getElementById('xml-folder-input').click()">📁 Carica cartella XML</button>
       <input type="file" id="xml-folder-input" accept=".xml" webkitdirectory directory multiple style="display:none" onchange="caricaFattureXML(event)">
       <button class="btn danger" id="btn-delete-selected-invoices" onclick="eliminaFattureSelezionate()" disabled>🗑 Elimina selezionate <span id="fat-selected-count">0</span></button>
-      <button class="btn" onclick="esportaBackupFatture()">📥 Backup XML importati</button>
+      <button class="btn" onclick="esportaBackupFatture()">📥 Backup fatture JSON</button>
       <button class="btn danger" id="btn-delete-all-invoices" onclick="eliminaTutteFatture()" disabled>🗑 Svuota archivio</button>
       <input class="search" type="text" id="fat-search" placeholder="🔍 Cerca fornitore..." oninput="renderFatture()" style="max-width:280px">
       <select class="select" id="fat-status-filter" onchange="renderFatture()" style="width:auto;padding:0.45rem 0.8rem;font-size:0.8rem">
