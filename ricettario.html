@@ -1043,18 +1043,34 @@ function idFattura(fat) {
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
+function chiaveUnivocaFattura(fat) {
+  return [fat.piva, fat.fornitore, fat.data, fat.numero]
+    .map(v => String(v || '').trim().toUpperCase())
+    .join('|');
+}
+
 async function caricaFattureXML(event) {
   const files = Array.from(event.target.files);
   event.target.value = '';
+  const presenti = new Set(Object.values(FATTURE).map(chiaveUnivocaFattura));
+  let caricate = 0;
+  let giaPresenti = 0;
   for (const file of files) {
     const text = await file.text();
     const fat = parseXMLFattura(text);
+    const chiave = chiaveUnivocaFattura(fat);
+    if (presenti.has(chiave)) {
+      giaPresenti++;
+      continue;
+    }
     const id = idFattura(fat);
     fat.nomeFile = file.name;
     fat.caricata = new Date().toISOString();
     fat.nuoviArticoli = fat.righe.filter(r => !ASSOCIAZIONI[r.desc+'|'+fat.fornitore]).length;
     await window._save('fatture', id, fat);
     FATTURE[id] = fat;
+    presenti.add(chiave);
+    caricate++;
     // Aggiungi articoli non ancora in associazioni
     fat.righe.forEach(r => {
       const key = r.desc+'|'+fat.fornitore;
@@ -1079,6 +1095,7 @@ async function caricaFattureXML(event) {
   renderAssociazioni();
   // Ricalcola costi ingredienti
   aggiornaCostiDaAssociazioni();
+  if (files.length) alert(`${caricate} fatture caricate, ${giaPresenti} già presenti ignorate.`);
 }
 
 async function eliminaTutteFatture() {
