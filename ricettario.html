@@ -1082,10 +1082,14 @@ async function salvaRicetta() {
   const nome = document.getElementById('ric-nome').value.trim();
   const err = document.getElementById('ric-err');
   if (!nome) { err.textContent = 'Inserisci il nome'; return; }
+  const precedente = RICETTE[id] || {};
+  const prezzoInserito = parseFloat(document.getElementById('ric-prezzo').value)||0;
   const data = {
+    ...precedente,
     nome,
     categoria: document.getElementById('ric-cat').value.trim(),
-    prezzo: parseFloat(document.getElementById('ric-prezzo').value)||0,
+    prezzo: prezzoInserito,
+    prezzoManuale: precedente.origine==='chiusure' ? (precedente.prezzoManuale || Math.abs(prezzoInserito-(precedente.prezzo||0))>0.005) : precedente.prezzoManuale,
     porzioni: parseInt(document.getElementById('ric-porzioni').value)||1,
     ingredienti: (window._ricIng||[]).filter(r=>r.id&&r.qty>0),
     aggiornato: new Date().toISOString()
