@@ -319,6 +319,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="toolbar">
       <button class="btn primary" onclick="document.getElementById('xml-input').click()">📄 Carica fattura XML</button>
       <input type="file" id="xml-input" accept=".xml" multiple style="display:none" onchange="caricaFattureXML(event)">
+      <button class="btn danger" id="btn-delete-all-invoices" onclick="eliminaTutteFatture()" disabled>🗑 Svuota archivio</button>
       <input class="search" type="text" id="fat-search" placeholder="🔍 Cerca fornitore..." oninput="renderFatture()" style="max-width:280px">
     </div>
     <div class="stats-bar" id="fat-stats"></div>
@@ -619,6 +620,17 @@ window._getAll = async (col) => {
   const out = {};
   snap.forEach(d => { out[d.id] = d.data(); });
   return out;
+};
+window._deleteAll = async (col) => {
+  const snap = await getDocs(colRef(col));
+  const refs = [];
+  snap.forEach(d => refs.push(d.ref));
+  for (let i = 0; i < refs.length; i += 450) {
+    const batch = writeBatch(db);
+    refs.slice(i, i + 450).forEach(ref => batch.delete(ref));
+    await batch.commit();
+  }
+  return refs.length;
 };
 </script>
 
@@ -1023,13 +1035,21 @@ function parseXMLFattura(xmlStr) {
   return { fornitore, data, numero, totale, piva, righe };
 }
 
+function idFattura(fat) {
+  const identita = [fat.piva, fat.fornitore, fat.data, fat.numero]
+    .map(v => String(v || '').trim().toUpperCase())
+    .join('|');
+  return btoa(unescape(encodeURIComponent(identita)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
 async function caricaFattureXML(event) {
   const files = Array.from(event.target.files);
   event.target.value = '';
   for (const file of files) {
     const text = await file.text();
     const fat = parseXMLFattura(text);
-    const id = fat.data.replace(/-/g,'')+'_'+fat.numero.replace(/[^a-z0-9]/gi,'_');
+    const id = idFattura(fat);
     fat.nomeFile = file.name;
     fat.caricata = new Date().toISOString();
     fat.nuoviArticoli = fat.righe.filter(r => !ASSOCIAZIONI[r.desc+'|'+fat.fornitore]).length;
@@ -1061,9 +1081,32 @@ async function caricaFattureXML(event) {
   aggiornaCostiDaAssociazioni();
 }
 
+async function eliminaTutteFatture() {
+  const count = Object.keys(FATTURE).length;
+  if (!count) return;
+  if (!confirm(`Eliminare tutte le ${count} fatture del locale selezionato? Le associazioni e le ricette resteranno.`)) return;
+
+  const btn = document.getElementById('btn-delete-all-invoices');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Eliminazione...'; }
+  try {
+    const deleted = await window._deleteAll('fatture');
+    FATTURE = {};
+    renderFatture();
+    alert(`${deleted} fatture eliminate. Ora puoi reimportare i file XML.`);
+  } catch(e) {
+    alert('Errore durante l\'eliminazione: ' + e.message);
+    try { FATTURE = await window._getAll('fatture'); } catch(_) {}
+    renderFatture();
+  } finally {
+    if (btn) { btn.textContent = '🗑 Svuota archivio'; btn.disabled = !Object.keys(FATTURE).length; }
+  }
+}
+
 function renderFatture() {
   const list = document.getElementById('fat-list');
   const empty = document.getElementById('fat-empty');
+  const clearBtn = document.getElementById('btn-delete-all-invoices');
+  if (clearBtn) clearBtn.disabled = Object.keys(FATTURE).length === 0;
   const search = document.getElementById('fat-search').value.toLowerCase();
   let items = Object.entries(FATTURE).sort((a,b)=>b[1].data.localeCompare(a[1].data));
   if (search) items = items.filter(([,v])=>(v.fornitore||'').toLowerCase().includes(search));
