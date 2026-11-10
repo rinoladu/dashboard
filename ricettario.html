@@ -1075,7 +1075,7 @@ function idFattura(fat) {
 }
 
 function chiaveUnivocaFattura(fat) {
-  const normalizza = v => String(v || '').trim().toUpperCase().replace(/\\s+/g, ' ');
+  const normalizza = v => String(v || '').trim().toUpperCase().replace(/\s+/g, ' ');
   const identificativoFornitore = normalizza(fat.piva) || normalizza(fat.fornitore);
   return [identificativoFornitore, normalizza(fat.data), normalizza(fat.numero)].join('|');
 }
@@ -1278,7 +1278,7 @@ function apriDettaglioFattura(id) {
 function trovaIngredienteSuggerito(storageId){
   const current=ASSOCIAZIONI[storageId];
   if(!current)return null;
-  const norm=v=>String(v||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
   const target=norm(current.descrizione);
   if(!target)return null;
   for(const [otherId,other] of Object.entries(ASSOCIAZIONI)){
