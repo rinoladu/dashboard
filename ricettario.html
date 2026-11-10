@@ -458,7 +458,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="form-row-2">
       <div class="form-row">
         <div class="form-label">IVA vendita (%)</div>
-        <input class="form-input" type="number" min="0" max="30" step="0.1" id="ric-iva" value="10" oninput="ricalcolaPrezzoNettoRicetta()">
+        <input class="form-input" type="number" min="0" max="30" step="0.1" id="ric-iva" value="10" oninput="ricalcolaPrezzoNettoRicetta(true)">
       </div>
       <div class="form-row">
         <div class="form-label">Prezzo netto / imponibile (€)</div>
@@ -914,7 +914,10 @@ async function sincronizzaRicetteChiusure(){
       const next={...r,nome:p.nome,categoria:r.categoria||p.categoria,codiceVendita:p.codice||r.codiceVendita,prezzoOsservato:prezzo,prezzoNettoOsservato:prezzoNetto,nettoStimato:p.nettoStimato,ultimaChiusura:p.data||ultima};
       if(!r.prezzoManuale&&p.data>=ultima&&prezzo>0){
         next.prezzo=prezzo;
-        if(!r.prezzoNettoManuale){next.prezzoNetto=prezzoNetto;next.prezzoNettoStimato=p.nettoStimato;next.aliquotaIva=aliquotaIva;}
+        if(!r.prezzoNettoManuale){
+          if(r.aliquotaIvaManuale&&p.nettoStimato){next.prezzoNetto=prezzo/(1+(Number(r.aliquotaIva)||10)/100);next.prezzoNettoStimato=true;}
+          else{next.prezzoNetto=prezzoNetto;next.prezzoNettoStimato=p.nettoStimato;if(!r.aliquotaIvaManuale)next.aliquotaIva=aliquotaIva;}
+        }
       }
       if(JSON.stringify(next)!==JSON.stringify(r)){await window._save('ricette',id,next);RICETTE[id]=next;updated++;}else existing++;
     }else{
@@ -1058,7 +1061,9 @@ function apriModalRicetta(id) {
   document.getElementById('ric-cat').value = v.categoria||'';
   document.getElementById('ric-prezzo').value = v.prezzo||'';
   const aliquotaIva=Number(v.aliquotaIva)||10;
-  document.getElementById('ric-iva').value=aliquotaIva;
+  const ivaInput=document.getElementById('ric-iva');
+  ivaInput.value=aliquotaIva;
+  ivaInput.dataset.manual=v.aliquotaIvaManuale?'1':'';
   const nettoInput=document.getElementById('ric-prezzo-netto');
   nettoInput.value=Number(v.prezzoNetto)>0?v.prezzoNetto:(Number(v.prezzo||0)/(1+aliquotaIva/100)||'');
   nettoInput.dataset.manual=v.prezzoNettoManuale?'1':'';
@@ -1112,13 +1117,14 @@ function ricavoNettoRicetta(ricetta){
 function nettoRicettaStimato(ricetta){
   return ricetta.prezzoNettoStimato!==false && !ricetta.prezzoNettoManuale;
 }
-function ricalcolaPrezzoNettoRicetta(){
+function ricalcolaPrezzoNettoRicetta(aliquotaManuale=false){
   const lordo=parseFloat(document.getElementById('ric-prezzo').value)||0;
   const iva=parseFloat(document.getElementById('ric-iva').value)||10;
   const netto=document.getElementById('ric-prezzo-netto');
   netto.value=lordo>0?(lordo/(1+iva/100)).toFixed(2):'';
   netto.dataset.manual='';
   netto.dataset.stimato='1';
+  if(aliquotaManuale)document.getElementById('ric-iva').dataset.manual='1';
   aggiornaCostoRicettaPreview();
 }
 
@@ -1147,6 +1153,7 @@ async function salvaRicetta() {
   const prezzoNettoInserito=parseFloat(document.getElementById('ric-prezzo-netto').value)||0;
   const aliquotaIva=parseFloat(document.getElementById('ric-iva').value)||10;
   const nettoInput=document.getElementById('ric-prezzo-netto');
+  const ivaInput=document.getElementById('ric-iva');
   const data = {
     ...precedente,
     nome,
@@ -1154,6 +1161,7 @@ async function salvaRicetta() {
     prezzo: prezzoInserito,
     prezzoNetto: prezzoNettoInserito||prezzoInserito/(1+aliquotaIva/100),
     aliquotaIva,
+    aliquotaIvaManuale:ivaInput.dataset.manual==='1',
     prezzoNettoManuale:nettoInput.dataset.manual==='1',
     prezzoNettoStimato:nettoInput.dataset.stimato==='1',
     prezzoManuale: precedente.origine==='chiusure' ? (precedente.prezzoManuale || Math.abs(prezzoInserito-(precedente.prezzo||0))>0.005) : precedente.prezzoManuale,
