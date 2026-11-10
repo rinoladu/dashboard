@@ -971,9 +971,11 @@ function renderRicette() {
   grid.innerHTML = items.map(([id,v]) => {
     const {costo,completo} = calcolaCostoRicetta(v);
     const prezzo = parseFloat(v.prezzo)||0;
+    const prezzoNetto=ricavoNettoRicetta(v);
+    const nettoStimato=nettoRicettaStimato(v);
     const haIngredienti=(v.ingredienti||[]).length>0;
-    const fcPerc = prezzo>0 && completo ? (costo/prezzo*100) : null;
-    const margine = prezzo>0 && completo ? prezzo-costo : null;
+    const fcPerc = prezzoNetto>0 && completo ? (costo/prezzoNetto*100) : null;
+    const margine = prezzoNetto>0 && completo ? prezzoNetto-costo : null;
     const statoRicetta=!haIngredienti?'Da completare':completo?'Costo completo':'Ingredienti senza costo';
     return `<div class="card" onclick="apriDettaglioRicetta('${id}')">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -982,10 +984,11 @@ function renderRicette() {
       </div>
       <div class="card-cat">${(v.categoria||'').replace(/--/g,'').trim()||'—'}</div>
       <div style="font-size:.68rem;margin:.2rem 0 .45rem;color:${!haIngredienti?'var(--accent)':completo?'var(--green)':'var(--red)'}">${statoRicetta}</div>
-      ${prezzo>0?`<div class="card-row">Prezzo vendita <span>${fmt(prezzo)}</span></div>`:''}
+      ${prezzo>0?`<div class="card-row">Prezzo cassa IVA incl. <span>${fmt(prezzo)}</span></div>`:''}
+      ${prezzoNetto>0?`<div class="card-row">${nettoStimato?'Imponibile stimato':'Ricavo netto'} <span>${fmt(prezzoNetto)}${nettoStimato?'*':''}</span></div>`:''}
       <div class="card-row">Costo ingredienti <span>${completo?fmt(costo):'<span style="color:var(--text3)">incompleto</span>'}</span></div>
       ${margine!==null?`<div class="card-row">Margine unitario <span style="color:${margine>=0?'var(--green)':'var(--red)'}">${fmt(margine)}</span></div>`:''}
-      ${fcPerc!==null?`<div class="fc-badge ${fcColor(fcPerc)}">Food Cost ${fmtPerc(fcPerc)}</div>`:'<div class="fc-badge fc-none">Prezzo non impostato</div>'}
+      ${fcPerc!==null?`<div class="fc-badge ${fcColor(fcPerc)}">Food Cost sul netto ${fmtPerc(fcPerc)}</div>`:'<div class="fc-badge fc-none">Prezzo non impostato</div>'}
       <div style="font-size:0.65rem;color:var(--text3);margin-top:0.5rem">${(v.ingredienti||[]).length} ingredienti</div>
     </div>`;
   }).join('');
@@ -996,18 +999,21 @@ function apriDettaglioRicetta(id) {
   if (!v) return;
   const {costo,completo} = calcolaCostoRicetta(v);
   const prezzo = parseFloat(v.prezzo)||0;
-  const fcPerc = prezzo>0&&completo ? (costo/prezzo*100) : null;
-  const margine = prezzo>0&&completo ? prezzo-costo : null;
+  const prezzoNetto=ricavoNettoRicetta(v);
+  const nettoStimato=nettoRicettaStimato(v);
+  const fcPerc = prezzoNetto>0&&completo ? (costo/prezzoNetto*100) : null;
+  const margine = prezzoNetto>0&&completo ? prezzoNetto-costo : null;
 
   const html = `
     <div class="modal-title">${v.nome}</div>
     <div style="text-align:center;margin-bottom:1rem"><span class="cat-tag">${(v.categoria||'').replace(/--/g,'').trim()||'Senza categoria'}</span></div>
     <div class="detail-kpi">
       <div class="kpi-card"><div class="kpi-label">Costo ingredienti</div><div class="kpi-val" style="color:var(--accent)">${completo?fmt(costo):'N/D'}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Prezzo vendita</div><div class="kpi-val">${prezzo>0?fmt(prezzo):'—'}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Food Cost %</div><div class="kpi-val ${fcPerc?fcColor(fcPerc):''}">${fcPerc!==null?fmtPerc(fcPerc):'—'}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Ricavo netto</div><div class="kpi-val">${prezzoNetto>0?fmt(prezzoNetto):'—'}${nettoStimato?'*':''}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Food Cost sul netto</div><div class="kpi-val ${fcPerc?fcColor(fcPerc):''}">${fcPerc!==null?fmtPerc(fcPerc):'—'}</div></div>
     </div>
-    ${margine!==null?`<div style="text-align:center;margin-bottom:1rem;font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;color:var(--text3)">Margine unitario: <strong style="color:${margine>=0?'var(--green)':'var(--red)'}">${fmt(margine)}</strong> &nbsp;|&nbsp; Porzioni: ${v.porzioni||1}</div>`:''}
+    <div style="text-align:center;margin:-.35rem 0 1rem;font-size:.72rem;color:var(--text3)">Prezzo alla cassa (IVA inclusa): ${fmt(prezzo)} · ${Number(v.aliquotaIva)||10}% IVA${nettoStimato?' · imponibile stimato':''}</div>
+    ${margine!==null?`<div style="text-align:center;margin-bottom:1rem;font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;color:var(--text3)">Margine netto unitario: <strong style="color:${margine>=0?'var(--green)':'var(--red)'}">${fmt(margine)}</strong> &nbsp;|&nbsp; Porzioni: ${v.porzioni||1}</div>`:''}
     <div class="section-title">Ingredienti</div>
     <table style="width:100%">
       <thead><tr><th>Ingrediente</th><th class="num">Qtà</th><th>U.M.</th><th class="num">Costo</th></tr></thead>
