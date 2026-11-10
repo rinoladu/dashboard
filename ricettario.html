@@ -1695,9 +1695,8 @@ async function salvaAssociazione() {
     const timestamp=new Date().toISOString();
     let costoIngrediente=costoPerUm, dataCosto='';
     for(const [id,assoc] of corrispondenti){
-      const totaleAssoc=(Number(assoc.ultimoPrezzo)||0)*(Number(assoc.ultimaQty)||1);
-      const costoAssoc=(pezzi*qty)>0?totaleAssoc/(pezzi*qty):0;
-      const updated={...assoc,ingId,pezzi,qty,um,tipoConversione,costoPerUm:costoBaseDaAssociazione(assoc,pezzi,qty,tipoConversione),aggiornato:timestamp};
+      const costoAssoc=costoBaseDaAssociazione(assoc,pezzi,qty,tipoConversione);
+      const updated={...assoc,ingId,pezzi,qty,um,tipoConversione,costoPerUm:costoAssoc,aggiornato:timestamp};
       const docId=id.includes('|')?await idAssociazione(id):id;
       await window._save('associazioni',docId,updated);
       if(docId!==id){delete ASSOCIAZIONI[id];ASSOCIAZIONI[docId]=updated;}else ASSOCIAZIONI[id]=updated;
