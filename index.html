@@ -2272,6 +2272,7 @@ function parseWorkbook(wb, filename, periodo, mese=null) {
     const k=String(Math.round(parseFloat(item.cod)));
     // Se il file ha già TOT. IMP. pre-calcolato, usarlo; altrimenti calcola da totale
     item.imponibile = item._totImp !== null ? item._totImp : item.totale/1.10;
+    item.imponibileStimato = item._totImp === null;
     // Se il file ha già MARGINE pre-calcolato, usarlo direttamente
     if (item._margine !== null) {
       item.costoTot  = item._costoTot !== null ? item._costoTot : 0;
