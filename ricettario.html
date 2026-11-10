@@ -1257,18 +1257,24 @@ async function caricaFattureXML(event) {
       }
       fat.righe.forEach(r=>{
         const key=r.desc+'|'+fat.fornitore, storageId=chiaveAssoc.get(key);
+        const modello=trovaAssociazionePerDenominazione(r.desc,storageId);
         if(storageId){
-          ASSOCIAZIONI[storageId].ultimoPrezzo=r.pu;
-          ASSOCIAZIONI[storageId].ultimaQty=r.qty;
-          const history=ASSOCIAZIONI[storageId].storicoPrezzi||[];
+          const assoc=ASSOCIAZIONI[storageId];
+          if(!assoc.ingId&&modello){
+            assoc.ingId=modello.ingId;assoc.pezzi=modello.assoc.pezzi||1;assoc.qty=modello.assoc.qty||1;assoc.um=modello.assoc.um||'KG';
+          }
+          assoc.ultimoPrezzo=r.pu;assoc.ultimaQty=r.qty;assoc.um_fattura=r.um;
+          const history=assoc.storicoPrezzi||[];
           const last=history[history.length-1];
-          if(!last||last.data!==fat.data||last.prezzo!==r.pu||last.um!==r.um)history.push({data:fat.data,prezzo:r.pu,um:r.um});
-          ASSOCIAZIONI[storageId].storicoPrezzi=history.slice(-12);
-          ASSOCIAZIONI[storageId].aggiornato=new Date().toISOString();
+          if(!last||last.data!==fat.data||last.prezzo!==r.pu||last.um!==r.um||last.qty!==r.qty)history.push({data:fat.data,prezzo:r.pu,um:r.um,qty:r.qty});
+          assoc.storicoPrezzi=history.slice(-12);
+          if(assoc.ingId&&assoc.pezzi&&assoc.qty)assoc.costoPerUm=(r.pu*r.qty)/(assoc.pezzi*assoc.qty);
+          assoc.aggiornato=new Date().toISOString();
           dirtyAssoc.add(storageId);
         }else{
+          const pezzi=modello?.assoc.pezzi||1, qty=modello?.assoc.qty||1, um=modello?.assoc.um||'KG';
           chiaveAssoc.set(key,key);
-          ASSOCIAZIONI[key]={descrizione:r.desc,fornitore:fat.fornitore,piva:fat.piva,um_fattura:r.um,ultimoPrezzo:r.pu,ultimaQty:r.qty,storicoPrezzi:[{data:fat.data,prezzo:r.pu}],ingId:null,pezzi:1,qty:1,um:'KG',aggiornato:new Date().toISOString()};
+          ASSOCIAZIONI[key]={descrizione:r.desc,fornitore:fat.fornitore,piva:fat.piva,um_fattura:r.um,ultimoPrezzo:r.pu,ultimaQty:r.qty,storicoPrezzi:[{data:fat.data,prezzo:r.pu,um:r.um,qty:r.qty}],ingId:modello?.ingId||null,pezzi,qty,um,costoPerUm:modello?(r.pu*r.qty)/(pezzi*qty):0,aggiornato:new Date().toISOString()};
           dirtyAssoc.add(key);
         }
       });
@@ -1280,8 +1286,15 @@ async function caricaFattureXML(event) {
     const associazioni=[...dirtyAssoc];
     for(let i=0;i<associazioni.length;i++){
       const storageId=associazioni[i], val=ASSOCIAZIONI[storageId];
-      try{await window._save('associazioni',storageId.includes('|')?await idAssociazione(storageId):storageId,val);associazioniAggiornate++;}
-      catch(e){errors.push(`${val.descrizione} · ${val.fornitore}: associazione non salvata — ${e.message||e}`);}
+      try{
+        const docId=storageId.includes('|')?await idAssociazione(storageId):storageId;
+        await window._save('associazioni',docId,val);
+        if(docId!==storageId){
+          delete ASSOCIAZIONI[storageId];ASSOCIAZIONI[docId]=val;
+          for(const [k,v] of chiaveAssoc)if(v===storageId)chiaveAssoc.set(k,docId);
+        }
+        associazioniAggiornate++;
+      }catch(e){errors.push(`${val.descrizione} · ${val.fornitore}: associazione non salvata — ${e.message||e}`);}
       if((i+1)%10===0||i+1===associazioni.length){
         aggiornaStatoImportazione({titolo:'Aggiornamento associazioni…',corrente:i+1,totale:associazioni.length,fase:'associazioni',riepilogo:`${associazioniAggiornate} aggiornate · ${errors.length} errori`,errori:errors});
         await new Promise(resolve=>setTimeout(resolve,0));
