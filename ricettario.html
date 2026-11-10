@@ -447,12 +447,23 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
     <div class="form-row-2">
       <div class="form-row">
-        <div class="form-label">Prezzo di vendita (€)</div>
-        <input class="form-input" type="number" step="0.01" min="0" id="ric-prezzo" placeholder="0.00" oninput="aggiornaCostoRicettaPreview()">
+        <div class="form-label">Prezzo alla cassa IVA inclusa (€)</div>
+        <input class="form-input" type="number" step="0.01" min="0" id="ric-prezzo" placeholder="0.00" oninput="ricalcolaPrezzoNettoRicetta()">
       </div>
       <div class="form-row">
         <div class="form-label">Porzioni</div>
         <input class="form-input" type="number" step="1" min="1" id="ric-porzioni" placeholder="1" value="1" oninput="aggiornaCostoRicettaPreview()">
+      </div>
+    </div>
+    <div class="form-row-2">
+      <div class="form-row">
+        <div class="form-label">IVA vendita (%)</div>
+        <input class="form-input" type="number" min="0" max="30" step="0.1" id="ric-iva" value="10" oninput="ricalcolaPrezzoNettoRicetta()">
+      </div>
+      <div class="form-row">
+        <div class="form-label">Prezzo netto / imponibile (€)</div>
+        <input class="form-input" type="number" min="0" step="0.01" id="ric-prezzo-netto" placeholder="0.00" oninput="this.dataset.manual='1';this.dataset.stimato='0';aggiornaCostoRicettaPreview()">
+        <div style="font-size:.65rem;color:var(--text3);margin-top:.25rem">Usato per food cost e margine. Puoi correggerlo manualmente.</div>
       </div>
     </div>
     <hr class="divider">
@@ -1038,6 +1049,12 @@ function apriModalRicetta(id) {
   document.getElementById('ric-nome').value = v.nome||'';
   document.getElementById('ric-cat').value = v.categoria||'';
   document.getElementById('ric-prezzo').value = v.prezzo||'';
+  const aliquotaIva=Number(v.aliquotaIva)||10;
+  document.getElementById('ric-iva').value=aliquotaIva;
+  const nettoInput=document.getElementById('ric-prezzo-netto');
+  nettoInput.value=Number(v.prezzoNetto)>0?v.prezzoNetto:(Number(v.prezzo||0)/(1+aliquotaIva/100)||'');
+  nettoInput.dataset.manual=v.prezzoNettoManuale?'1':'';
+  nettoInput.dataset.stimato=v.prezzoNettoStimato===false?'0':'1';
   document.getElementById('ric-porzioni').value = v.porzioni||1;
   // Popola datalist
   const dl = document.getElementById('cat-ric-datalist');
@@ -1078,36 +1095,59 @@ function aggiungiIngredienteRicetta() {
   renderIngListRicetta();
 }
 
-function aggiornaCostoRicettaPreview() {
-  const prezzo = parseFloat(document.getElementById('ric-prezzo').value)||0;
-  const porzioni = parseFloat(document.getElementById('ric-porzioni').value)||1;
-  const temp = { ingredienti: window._ricIng, porzioni };
-  const {costo,completo} = calcolaCostoRicetta(temp);
-  const fcPerc = prezzo>0&&costo>0 ? (costo/prezzo*100) : null;
-  const el = document.getElementById('ric-cost-preview');
-  if (!window._ricIng||!window._ricIng.filter(r=>r.id&&r.qty).length) {
-    el.innerHTML = '<span style="color:var(--text3)">Aggiungi ingredienti per calcolare il food cost</span>';
-    return;
-  }
-  el.innerHTML =
-    `<span style="color:var(--text2)">Costo totale:</span> <strong style="color:var(--accent)">${fmt(costo)}</strong>` +
-    (prezzo>0?` &nbsp;|&nbsp; <span style="color:var(--text2)">Food Cost:</span> <strong class="${fcColor(fcPerc)}">${fmtPerc(fcPerc)}</strong>`:'') +
-    (prezzo>0?` &nbsp;|&nbsp; <span style="color:var(--text2)">Margine:</span> <strong style="color:${prezzo-costo>=0?'var(--green)':'var(--red)'}">${fmt(prezzo-costo)}</strong>`:'') +
-    (!completo?'<br><span style="color:var(--text3);font-size:0.68rem">⚠ Alcuni ingredienti non hanno costo impostato</span>':'');
+function ricavoNettoRicetta(ricetta){
+  const netto=Number(ricetta.prezzoNetto);
+  if(netto>0)return netto;
+  const lordo=Number(ricetta.prezzo)||0, iva=Number(ricetta.aliquotaIva)||10;
+  return lordo/(1+iva/100);
+}
+function nettoRicettaStimato(ricetta){
+  return ricetta.prezzoNettoStimato!==false && !ricetta.prezzoNettoManuale;
+}
+function ricalcolaPrezzoNettoRicetta(){
+  const lordo=parseFloat(document.getElementById('ric-prezzo').value)||0;
+  const iva=parseFloat(document.getElementById('ric-iva').value)||10;
+  const netto=document.getElementById('ric-prezzo-netto');
+  netto.value=lordo>0?(lordo/(1+iva/100)).toFixed(2):'';
+  netto.dataset.manual='';
+  netto.dataset.stimato='1';
+  aggiornaCostoRicettaPreview();
 }
 
+function aggiornaCostoRicettaPreview() {
+  const prezzoNetto=parseFloat(document.getElementById('ric-prezzo-netto').value)||0;
+  const porzioni=parseFloat(document.getElementById('ric-porzioni').value)||1;
+  const temp={ingredienti:window._ricIng,porzioni};
+  const {costo,completo}=calcolaCostoRicetta(temp);
+  const fcPerc=prezzoNetto>0&&costo>0?(costo/prezzoNetto*100):null;
+  const el=document.getElementById('ric-cost-preview');
+  if(!window._ricIng||!window._ricIng.filter(r=>r.id&&r.qty).length){
+    el.innerHTML='<span style="color:var(--text3)">Aggiungi ingredienti per calcolare il food cost</span>';return;
+  }
+  el.innerHTML='<span style="color:var(--text2)">Costo totale:</span> <strong style="color:var(--accent)">'+fmt(costo)+'</strong>'+
+    (prezzoNetto>0?' &nbsp;|&nbsp; <span style="color:var(--text2)">Food Cost sul netto:</span> <strong class="'+fcColor(fcPerc)+'">'+fmtPerc(fcPerc)+'</strong>':'')+
+    (prezzoNetto>0?' &nbsp;|&nbsp; <span style="color:var(--text2)">Margine netto:</span> <strong style="color:'+(prezzoNetto-costo>=0?'var(--green)':'var(--red)')+'">'+fmt(prezzoNetto-costo)+'</strong>':'')+
+    (!completo?'<br><span style="color:var(--text3);font-size:0.68rem">⚠ Alcuni ingredienti non hanno costo impostato</span>':'');
+}
 async function salvaRicetta() {
   const id = document.getElementById('ric-edit-id').value || uid();
   const nome = document.getElementById('ric-nome').value.trim();
   const err = document.getElementById('ric-err');
   if (!nome) { err.textContent = 'Inserisci il nome'; return; }
   const precedente = RICETTE[id] || {};
-  const prezzoInserito = parseFloat(document.getElementById('ric-prezzo').value)||0;
+  const prezzoInserito=parseFloat(document.getElementById('ric-prezzo').value)||0;
+  const prezzoNettoInserito=parseFloat(document.getElementById('ric-prezzo-netto').value)||0;
+  const aliquotaIva=parseFloat(document.getElementById('ric-iva').value)||10;
+  const nettoInput=document.getElementById('ric-prezzo-netto');
   const data = {
     ...precedente,
     nome,
     categoria: document.getElementById('ric-cat').value.trim(),
     prezzo: prezzoInserito,
+    prezzoNetto: prezzoNettoInserito||prezzoInserito/(1+aliquotaIva/100),
+    aliquotaIva,
+    prezzoNettoManuale:nettoInput.dataset.manual==='1',
+    prezzoNettoStimato:nettoInput.dataset.stimato==='1',
     prezzoManuale: precedente.origine==='chiusure' ? (precedente.prezzoManuale || Math.abs(prezzoInserito-(precedente.prezzo||0))>0.005) : precedente.prezzoManuale,
     porzioni: parseInt(document.getElementById('ric-porzioni').value)||1,
     ingredienti: (window._ricIng||[]).filter(r=>r.id&&r.qty>0),
