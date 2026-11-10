@@ -319,6 +319,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="toolbar">
       <button class="btn primary" onclick="document.getElementById('xml-input').click()">📄 Carica fattura XML</button>
       <input type="file" id="xml-input" accept=".xml" multiple style="display:none" onchange="caricaFattureXML(event)">
+      <button class="btn" onclick="document.getElementById('xml-folder-input').click()">📁 Carica cartella XML</button>
+      <input type="file" id="xml-folder-input" accept=".xml" webkitdirectory directory multiple style="display:none" onchange="caricaFattureXML(event)">
       <button class="btn danger" id="btn-delete-all-invoices" onclick="eliminaTutteFatture()" disabled>🗑 Svuota archivio</button>
       <input class="search" type="text" id="fat-search" placeholder="🔍 Cerca fornitore..." oninput="renderFatture()" style="max-width:280px">
     </div>
