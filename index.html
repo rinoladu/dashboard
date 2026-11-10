@@ -2426,7 +2426,9 @@ function renderClassificaProdotti() {
   const rows=CURRENT_DATA.chiusura.filter(r=>!CATEGORIE_ESCLUSE.includes(r.cat)&&r.prodotto);
   const cats=[...new Set(rows.map(r=>r.cat||'N/D'))].sort((a,b)=>a.localeCompare(b,'it'));
   const current=category.value;
-  category.innerHTML='<option value="">Tutte le categorie</option>'+cats.map(c=>'<option value="'+c.replace(/"/g,'&quot;')+'">'+c.replace(/--/g,'').trim()+'</option>').join('');
+  category.replaceChildren();
+  const allOption=document.createElement('option');allOption.value='';allOption.textContent='Tutte le categorie';category.appendChild(allOption);
+  cats.forEach(c=>{const option=document.createElement('option');option.value=c;option.textContent=c.replace(/--/g,'').trim();category.appendChild(option);});
   category.value=cats.includes(current)?current:'';
   const grouped=new Map();
   rows.filter(r=>(!category.value||(r.cat||'N/D')===category.value)&&(!search||String(r.prodotto).toLocaleLowerCase('it').includes(search))).forEach(r=>{
