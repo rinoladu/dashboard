@@ -2207,7 +2207,7 @@ function parseWorkbook(wb, filename, periodo, mese=null) {
         qty:      parseFloat(r[idx.qty])||0,
         totale:   parseFloat(r[idx.totale])||0,
         // Se il file ha già imponibile e margine pre-calcolati, li salviamo
-        _totImp:   idx.totImp>=0  ? (parseFloat(r[idx.totImp])||0)   : null,
+        _totImp:   idx.totImp>=0 && Number.isFinite(parseFloat(r[idx.totImp])) ? parseFloat(r[idx.totImp]) : null,
         _margine:  idx.margine>=0 ? (parseFloat(r[idx.margine])||0)  : null,
         _costoTot: idx.costoTot>=0? (parseFloat(r[idx.costoTot])||0) : null,
       });
