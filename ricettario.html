@@ -627,6 +627,7 @@ window.selezionaLocaleRic = async (localeId, localeNome) => {
   const sub = document.querySelector('.logo-sub');
   if (sub) sub.textContent = localeNome;
   await Promise.all([caricaIngredienti(), caricaRicette(), caricaFatture(), caricaAssociazioni()]);
+  await sincronizzaAssociazioniIdentiche();
   initAliasMap();
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -1404,6 +1405,41 @@ function apriDettaglioFattura(id) {
 function normalizzaDenominazioneArticolo(value){
   return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
 }
+async function sincronizzaAssociazioniIdentiche(){
+  const gruppi=new Map();
+  for(const [id,assoc] of Object.entries(ASSOCIAZIONI)){
+    const key=normalizzaDenominazioneArticolo(assoc.descrizione);
+    if(!key)continue;
+    if(!gruppi.has(key))gruppi.set(key,[]);
+    gruppi.get(key).push([id,assoc]);
+  }
+  let aggiornate=0;
+  for(const righe of gruppi.values()){
+    const associate=righe.filter(([,a])=>a.ingId&&INGREDIENTI[a.ingId]);
+    const ingredienti=[...new Set(associate.map(([,a])=>a.ingId))];
+    if(ingredienti.length!==1)continue;
+    associate.sort((a,b)=>{
+      const data=x=>(x[1].storicoPrezzi||[]).reduce((m,h)=>h.data&&h.data>m?h.data:m,'');
+      return data(b).localeCompare(data(a));
+    });
+    const [,,] = [];
+    const template=associate[0][1];
+    for(const [id,assoc] of righe){
+      if(assoc.ingId)continue;
+      const pezzi=Number(template.pezzi)||1, qty=Number(template.qty)||1, um=template.um||'KG';
+      const totale=(Number(assoc.ultimoPrezzo)||0)*(Number(assoc.ultimaQty)||1);
+      const updated={...assoc,ingId:template.ingId,pezzi,qty,um,costoPerUm:totale/(pezzi*qty),aggiornato:new Date().toISOString()};
+      try{
+        const docId=id.includes('|')?await idAssociazione(id):id;
+        await window._save('associazioni',docId,updated);
+        if(docId!==id){delete ASSOCIAZIONI[id];ASSOCIAZIONI[docId]=updated;}else ASSOCIAZIONI[id]=updated;
+        aggiornate++;
+      }catch(e){console.error('Sincronizzazione associazione identica:',assoc.descrizione,e);}
+    }
+  }
+  return aggiornate;
+}
+
 function trovaAssociazionePerDenominazione(descrizione,excludeId){
   const target=normalizzaDenominazioneArticolo(descrizione);
   if(!target)return null;
