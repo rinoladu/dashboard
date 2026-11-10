@@ -371,6 +371,14 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <option value="da_associare">Da associare</option>
         <option value="associati">Associati</option>
       </select>
+      <select class="select" id="ass-sort" onchange="renderAssociazioni()" aria-label="Ordina associazioni" style="width:auto;padding:0.45rem 0.8rem;font-size:0.8rem">
+        <option value="da_associare">Da associare prima</option>
+        <option value="nome_asc">Denominazione A-Z</option>
+        <option value="nome_desc">Denominazione Z-A</option>
+        <option value="fornitore_asc">Fornitore A-Z</option>
+        <option value="costo_asc">Costo crescente</option>
+        <option value="costo_desc">Costo decrescente</option>
+      </select>
     </div>
     <div class="stats-bar" id="ass-stats"></div>
     <div id="ass-list"></div>
@@ -1536,7 +1544,18 @@ function renderAssociazioni() {
   if (search) items = items.filter(([,v])=>(v.descrizione||'').toLowerCase().includes(search)||(v.fornitore||'').toLowerCase().includes(search));
   if (filter==='da_associare') items = items.filter(([,v])=>!v.ingId);
   if (filter==='associati') items = items.filter(([,v])=>!!v.ingId);
-  items.sort((a,b)=>(a[1].ingId?1:0)-(b[1].ingId?1:0)||(a[1].fornitore||'').localeCompare(b[1].fornitore||'')||a[1].descrizione.localeCompare(b[1].descrizione));
+  const sort=document.getElementById('ass-sort')?.value||'da_associare';
+  const nome=(v)=>(v.descrizione||'').toLocaleLowerCase('it');
+  const fornitore=(v)=>(v.fornitore||'').toLocaleLowerCase('it');
+  const costo=(v)=>{const ing=v.ingId?INGREDIENTI[v.ingId]:null;return ing?Number(ing.costoUnit)||0:0;};
+  items.sort((a,b)=>{
+    if(sort==='nome_asc')return nome(a[1]).localeCompare(nome(b[1]),'it')||fornitore(a[1]).localeCompare(fornitore(b[1]),'it');
+    if(sort==='nome_desc')return nome(b[1]).localeCompare(nome(a[1]),'it')||fornitore(a[1]).localeCompare(fornitore(b[1]),'it');
+    if(sort==='fornitore_asc')return fornitore(a[1]).localeCompare(fornitore(b[1]),'it')||nome(a[1]).localeCompare(nome(b[1]),'it');
+    if(sort==='costo_asc')return costo(a[1])-costo(b[1])||nome(a[1]).localeCompare(nome(b[1]),'it');
+    if(sort==='costo_desc')return costo(b[1])-costo(a[1])||nome(a[1]).localeCompare(nome(b[1]),'it');
+    return (a[1].ingId?1:0)-(b[1].ingId?1:0)||fornitore(a[1]).localeCompare(fornitore(b[1]),'it')||nome(a[1]).localeCompare(nome(b[1]),'it');
+  });
 
   const daFare = Object.values(ASSOCIAZIONI).filter(v=>!v.ingId).length;
   document.getElementById('ass-stats').innerHTML =
