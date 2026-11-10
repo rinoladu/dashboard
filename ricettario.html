@@ -318,7 +318,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <input class="search" type="text" id="ric-search" placeholder="🔍 Cerca ricetta..." oninput="renderRicette()">
       <select class="select" id="ric-cat-filter" onchange="renderRicette()" style="width:auto;padding:0.45rem 0.8rem;font-size:0.8rem">
         <option value="">Tutte le categorie</option>
-      </select>
+      </select><select class="select" id="ric-status-filter" onchange="renderRicette()" style="width:auto;padding:0.45rem 0.8rem;font-size:0.8rem"><option value="">Tutti gli stati</option><option value="todo">Da completare</option><option value="nocost">Ingredienti senza costo</option><option value="complete">Costo completo</option></select>
       <button class="btn" onclick="aggiornaRicetteDaChiusure()">↻ Aggiorna da chiusure</button><span id="ric-chiusure-status" style="font-size:.75rem;color:var(--text2)"></span><button class="btn blue" onclick="apriModalRicetta()">+ Nuova ricetta</button>
     </div>
     <div class="stats-bar" id="ric-stats"></div>
@@ -911,6 +911,7 @@ function renderRicette() {
   const empty = document.getElementById('ric-empty');
   const search = document.getElementById('ric-search').value.toLowerCase();
   const catFilter = document.getElementById('ric-cat-filter').value;
+  const statusFilter = document.getElementById('ric-status-filter').value;
 
   // Aggiorna select categorie
   const cats = getCatList(RICETTE);
@@ -922,18 +923,24 @@ function renderRicette() {
   let items = Object.entries(RICETTE);
   if (search) items = items.filter(([,v])=>(v.nome||'').toLowerCase().includes(search));
   if (catFilter) items = items.filter(([,v])=>v.categoria===catFilter);
+  if (statusFilter==='todo') items=items.filter(([,v])=>!(v.ingredienti||[]).length);
+  if (statusFilter==='nocost') items=items.filter(([,v])=>(v.ingredienti||[]).length>0&&!calcolaCostoRicetta(v).completo);
+  if (statusFilter==='complete') items=items.filter(([,v])=>calcolaCostoRicetta(v).completo);
   items.sort((a,b)=>(a[1].categoria||'').localeCompare(b[1].categoria||'')||a[1].nome.localeCompare(b[1].nome));
 
   // Stats
-  let totCosto=0, nCompleti=0;
+  let nCompleti=0,nDaCompletare=0,nSenzaCosto=0;
   Object.values(RICETTE).forEach(r => {
-    const {costo,completo} = calcolaCostoRicetta(r);
-    totCosto+=costo;
-    if(completo) nCompleti++;
+    const {completo}=calcolaCostoRicetta(r);
+    if(!(r.ingredienti||[]).length)nDaCompletare++;
+    else if(completo)nCompleti++;
+    else nSenzaCosto++;
   });
   document.getElementById('ric-stats').innerHTML =
-    `<div class="stat-item"><div class="stat-label">Ricette</div><div class="stat-value">${Object.keys(RICETTE).length}</div></div>` +
-    `<div class="stat-item"><div class="stat-label">Complete</div><div class="stat-value" style="color:var(--green)">${nCompleti}</div></div>`;
+    '<div class="stat-item"><div class="stat-label">Ricette</div><div class="stat-value">'+Object.keys(RICETTE).length+'</div></div>' +
+    '<div class="stat-item"><div class="stat-label">Da completare</div><div class="stat-value" style="color:var(--accent)">'+nDaCompletare+'</div></div>' +
+    '<div class="stat-item"><div class="stat-label">Senza costo</div><div class="stat-value" style="color:var(--red)">'+nSenzaCosto+'</div></div>' +
+    '<div class="stat-item"><div class="stat-label">Costo completo</div><div class="stat-value" style="color:var(--green)">'+nCompleti+'</div></div>';
 
   if (!items.length) {
     grid.innerHTML=''; empty.style.display='block'; return;
@@ -943,14 +950,17 @@ function renderRicette() {
   grid.innerHTML = items.map(([id,v]) => {
     const {costo,completo} = calcolaCostoRicetta(v);
     const prezzo = parseFloat(v.prezzo)||0;
-    const fcPerc = prezzo>0 ? (costo/prezzo*100) : null;
-    const margine = prezzo>0 ? prezzo-costo : null;
+    const haIngredienti=(v.ingredienti||[]).length>0;
+    const fcPerc = prezzo>0 && completo ? (costo/prezzo*100) : null;
+    const margine = prezzo>0 && completo ? prezzo-costo : null;
+    const statoRicetta=!haIngredienti?'Da completare':completo?'Costo completo':'Ingredienti senza costo';
     return `<div class="card" onclick="apriDettaglioRicetta('${id}')">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div class="card-name">${v.nome}</div>
         <button class="btn" style="padding:0.2rem 0.4rem;font-size:0.7rem" onclick="event.stopPropagation();apriModalRicetta('${id}')">✏</button>
       </div>
       <div class="card-cat">${(v.categoria||'').replace(/--/g,'').trim()||'—'}</div>
+      <div style="font-size:.68rem;margin:.2rem 0 .45rem;color:${!haIngredienti?'var(--accent)':completo?'var(--green)':'var(--red)'}">${statoRicetta}</div>
       ${prezzo>0?`<div class="card-row">Prezzo vendita <span>${fmt(prezzo)}</span></div>`:''}
       <div class="card-row">Costo ingredienti <span>${completo?fmt(costo):'<span style="color:var(--text3)">incompleto</span>'}</span></div>
       ${margine!==null?`<div class="card-row">Margine unitario <span style="color:${margine>=0?'var(--green)':'var(--red)'}">${fmt(margine)}</span></div>`:''}
