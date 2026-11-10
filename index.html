@@ -918,6 +918,7 @@ body.light .emoji-btn { background: #e8eaed; }
             <div class="obiettivo-row-label">Mancante / Surplus</div>
             <div class="obiettivo-row-value" id="obiettivo-delta">—</div>
           </div>
+          <div class="obiettivo-row"><div class="obiettivo-row-label">Vs mese scorso</div><div class="obiettivo-row-value" id="obiettivo-confronto">—</div></div>
         </div>
       </div>
       <div class="obiettivo-track">
@@ -1098,6 +1099,9 @@ body.light .emoji-btn { background: #e8eaed; }
     <div class="card"><div class="card-label">Marg. effettivo</div><div class="card-value" id="s-marg-eff">—</div><div class="progress-bar-wrap"><div class="progress-bar-fill" id="s-progress" style="width:0%"></div></div></div>
     <div class="card full"><div class="card-label">Top 5 categorie per quantità</div><div id="top5-bars" style="margin-top:0.5rem"></div></div>
   </div>
+  <details style="margin:0.5rem 0 1rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:0.6rem 0.9rem">
+    <summary style="cursor:pointer;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2)">Apri classifiche dettagliate per categoria</summary>
+    <div style="padding-top:.8rem">
   <div class="section-title">Analisi per categoria</div>
   <div class="btn-grid">
     <button class="btn-stat blue full" onclick="openModal('cat-vendute')">🏆 Cat. più vendute</button>
@@ -1179,6 +1183,8 @@ body.light .emoji-btn { background: #e8eaed; }
     <button class="btn-stat green" onclick="openModal('birre-incasso')">Birre più incasso</button>
     <button class="btn-stat orange" onclick="openModal('birre-margine')">Birre più margine</button>
   </div>
+  </div>
+  </details>
   <div style="height:2rem"></div>
 </div>
 
@@ -3439,6 +3445,16 @@ function aggiornaWidgetObiettivo() {
   });
 
   const incassatoMese = chiusureMese.reduce((s, c) => s + (c.totLordo || (c.totImponibile||0)*1.10), 0);
+  const giorniMeseValutati = isOggi ? ora.getDate() : new Date(annoCorrente, meseCorrente+1, 0).getDate();
+  const dataPrev = new Date(annoCorrente, meseCorrente-1, 1);
+  const giorniPrevValutati = Math.min(giorniMeseValutati, new Date(dataPrev.getFullYear(),dataPrev.getMonth()+1,0).getDate());
+  const chiusurePrev = CHIUSURE.filter(c => {
+    if ((c.tipo||'giorno')!=='giorno') return false;
+    const d=new Date(c.data+'T00:00:00');
+    return d.getFullYear()===dataPrev.getFullYear() && d.getMonth()===dataPrev.getMonth() && d.getDate()<=giorniPrevValutati;
+  });
+  const incassoPrev = chiusurePrev.reduce((s,c)=>s+(c.totLordo||(c.totImponibile||0)*1.10),0);
+  const confrontoMese = chiusurePrev.length ? {delta:incassatoMese-incassoPrev,perc:incassoPrev?((incassatoMese-incassoPrev)/incassoPrev)*100:null} : null;
 
   // Suggerimento automatico dal break even dell'ultima mensile
   const breakEvenAuto = calcolaBreakEvenAuto(annoCorrente, meseCorrente);
@@ -3490,6 +3506,14 @@ function aggiornaWidgetObiettivo() {
   // Valori
   document.getElementById('obiettivo-incassato').textContent = fmt(incassatoMese);
   document.getElementById('obiettivo-target').textContent = target > 0 ? fmt(target) : '—';
+  const confrontoEl=document.getElementById('obiettivo-confronto');
+  if(confrontoEl){
+    if(confrontoMese){
+      const p=confrontoMese.perc===null?'':(' · '+(confrontoMese.perc>0?'+':'')+confrontoMese.perc.toFixed(1)+'%');
+      confrontoEl.textContent=(confrontoMese.delta>0?'+':'')+fmt(confrontoMese.delta)+p;
+      confrontoEl.className='obiettivo-row-value '+(confrontoMese.delta>=0?'grn':'red');
+    }else{confrontoEl.textContent='N/D';confrontoEl.className='obiettivo-row-value';}
+  }
 
   const delta = incassatoMese - target;
   const deltaEl = document.getElementById('obiettivo-delta');
