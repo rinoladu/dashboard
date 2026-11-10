@@ -159,6 +159,22 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .badge-ok{background:rgba(61,214,140,0.15);color:var(--green);font-size:0.62rem;
   font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:0.08em;
   padding:0.1rem 0.4rem;border-radius:4px}
+.import-status{display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:0.8rem 1rem;margin-bottom:1rem}
+.import-status.show{display:block}
+.import-status-head{display:flex;justify-content:space-between;gap:1rem;align-items:center;font-size:0.8rem;color:var(--text2);margin-bottom:0.55rem}
+.import-status-head strong{color:var(--text)}
+.import-progress{width:100%;height:7px;appearance:none;border:0;border-radius:8px;overflow:hidden;background:var(--surface2)}
+.import-progress::-webkit-progress-bar{background:var(--surface2)}
+.import-progress::-webkit-progress-value{background:linear-gradient(90deg,var(--accent),#f5d98a);border-radius:8px}
+.import-progress::-moz-progress-bar{background:var(--accent);border-radius:8px}
+.import-summary{font-size:0.72rem;color:var(--text3);margin-top:0.5rem}
+.import-errors{font-size:0.72rem;color:#f29a9a;margin:0.5rem 0 0 1rem;max-height:120px;overflow:auto}
+.fattura-select{accent-color:var(--accent);width:16px;height:16px;cursor:pointer}
+.fattura-select-cell{display:flex;align-items:flex-start;padding:0.15rem 0.25rem 0 0}
+.price-change{font-size:0.65rem;margin-top:0.25rem;font-family:'Barlow Condensed',sans-serif}
+.price-change.up{color:var(--red)}
+.price-change.down{color:var(--green)}
+.price-change.flat{color:var(--text3)}
 
 /* ASSOC */
 .assoc-row{display:grid;grid-template-columns:1fr auto;gap:0.5rem;align-items:center;
@@ -321,8 +337,20 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <input type="file" id="xml-input" accept=".xml" multiple style="display:none" onchange="caricaFattureXML(event)">
       <button class="btn" onclick="document.getElementById('xml-folder-input').click()">📁 Carica cartella XML</button>
       <input type="file" id="xml-folder-input" accept=".xml" webkitdirectory directory multiple style="display:none" onchange="caricaFattureXML(event)">
+      <button class="btn danger" id="btn-delete-selected-invoices" onclick="eliminaFattureSelezionate()" disabled>🗑 Elimina selezionate <span id="fat-selected-count">0</span></button>
       <button class="btn danger" id="btn-delete-all-invoices" onclick="eliminaTutteFatture()" disabled>🗑 Svuota archivio</button>
       <input class="search" type="text" id="fat-search" placeholder="🔍 Cerca fornitore..." oninput="renderFatture()" style="max-width:280px">
+      <select class="select" id="fat-status-filter" onchange="renderFatture()" style="width:auto;padding:0.45rem 0.8rem;font-size:0.8rem">
+        <option value="tutti">Tutte le fatture</option>
+        <option value="da_associare">Con articoli da associare</option>
+        <option value="complete">Complete</option>
+      </select>
+    </div>
+    <div class="import-status" id="import-status" role="status" aria-live="polite">
+      <div class="import-status-head"><strong id="import-status-title">Importazione fatture</strong><span id="import-status-progress">0 / 0</span></div>
+      <progress class="import-progress" id="import-progress" max="100" value="0"></progress>
+      <div class="import-summary" id="import-summary"></div>
+      <ul class="import-errors" id="import-errors" style="display:none"></ul>
     </div>
     <div class="stats-bar" id="fat-stats"></div>
     <div id="fat-list"></div>
@@ -641,6 +669,7 @@ window._deleteAll = async (col) => {
 let INGREDIENTI = {};   // { id: { nome, categoria, um, costoUnit, scarto, note } }
 let RICETTE = {};       // { id: { nome, categoria, prezzo, porzioni, ingredienti:[{id,qty}] } }
 let FATTURE = {};       // { id: { fornitore, data, numero, totale, righe:[...], associata } }
+let FATTURE_SELEZIONATE = new Set();
 let ASSOCIAZIONI = {};  // { key: { descrizione, fornitore, prezzoUnitario, um_fattura, ingId, pezzi, qty, um } }
 
 async function caricaIngredienti() {
@@ -1046,9 +1075,9 @@ function idFattura(fat) {
 }
 
 function chiaveUnivocaFattura(fat) {
-  return [fat.piva, fat.fornitore, fat.data, fat.numero]
-    .map(v => String(v || '').trim().toUpperCase())
-    .join('|');
+  const normalizza = v => String(v || '').trim().toUpperCase().replace(/\\s+/g, ' ');
+  const identificativoFornitore = normalizza(fat.piva) || normalizza(fat.fornitore);
+  return [identificativoFornitore, normalizza(fat.data), normalizza(fat.numero)].join('|');
 }
 
 async function idAssociazione(key) {
@@ -1059,62 +1088,119 @@ async function idAssociazione(key) {
   return 'sha256_' + hex;
 }
 
+function aggiornaStatoImportazione({titolo, corrente, totale, fase, riepilogo='', errori=[]}) {
+  const box=document.getElementById('import-status');
+  box.classList.add('show');
+  document.getElementById('import-status-title').textContent=titolo;
+  document.getElementById('import-status-progress').textContent=`${corrente} / ${totale}${fase?' · '+fase:''}`;
+  document.getElementById('import-progress').value=totale?Math.round(corrente/totale*100):0;
+  document.getElementById('import-summary').textContent=riepilogo;
+  const ul=document.getElementById('import-errors');
+  ul.replaceChildren();
+  errori.slice(0,20).forEach(msg=>{const li=document.createElement('li');li.textContent=msg;ul.appendChild(li);});
+  ul.style.display=errori.length?'block':'none';
+  if(errori.length>20){const li=document.createElement('li');li.textContent=`Altri ${errori.length-20} errori non mostrati.`;ul.appendChild(li);}
+}
+
 async function caricaFattureXML(event) {
-  const files = Array.from(event.target.files);
-  event.target.value = '';
-  const records = [];
-  for (const file of files) {
-    const fat = parseXMLFattura(await file.text());
-    records.push({ file, fat, chiave: chiaveUnivocaFattura(fat) });
-  }
-  records.sort((a, b) => a.fat.data.localeCompare(b.fat.data) || a.fat.numero.localeCompare(b.fat.numero));
-
-  const presenti = new Set(Object.values(FATTURE).map(chiaveUnivocaFattura));
-  const chiaveAssoc = new Map();
-  for (const [storageId, val] of Object.entries(ASSOCIAZIONI)) {
-    if (val.descrizione && val.fornitore) chiaveAssoc.set(val.descrizione + '|' + val.fornitore, storageId);
-  }
-  let caricate = 0;
-  let giaPresenti = 0;
-  for (const { file, fat, chiave } of records) {
-    const giaPresente = presenti.has(chiave);
-    if (giaPresente) {
-      giaPresenti++;
-    } else {
-      const id = idFattura(fat);
-      fat.nomeFile = file.name;
-      fat.caricata = new Date().toISOString();
-      await window._save('fatture', id, fat);
-      FATTURE[id] = fat;
-      presenti.add(chiave);
-      caricate++;
-    }
-
-    fat.righe.forEach(r => {
-      const key = r.desc + '|' + fat.fornitore;
-      const storageId = chiaveAssoc.get(key);
-      if (storageId) {
-        ASSOCIAZIONI[storageId].ultimoPrezzo = r.pu;
-        ASSOCIAZIONI[storageId].ultimaQty = r.qty;
-      } else {
-        chiaveAssoc.set(key, key);
-        ASSOCIAZIONI[key] = {
-          descrizione: r.desc, fornitore: fat.fornitore, piva: fat.piva,
-          um_fattura: r.um, ultimoPrezzo: r.pu, ultimaQty: r.qty,
-          ingId: null, pezzi:1, qty:1, um:'KG', aggiornato: new Date().toISOString()
-        };
+  const input=event.target, files=Array.from(input.files||[]);
+  input.value='';
+  if(!files.length)return;
+  const uploadButtons=[...document.querySelectorAll('#p-fatture .toolbar button')];
+  uploadButtons.forEach(b=>b.disabled=true);
+  const errors=[], records=[];
+  let lette=0, caricate=0, giaPresenti=0, duplicateNelCaricamento=0, associazioniAggiornate=0;
+  aggiornaStatoImportazione({titolo:'Lettura file XML…',corrente:0,totale:files.length,fase:'lettura'});
+  try {
+    for(const file of files){
+      try{
+        const fat=parseXMLFattura(await file.text());
+        if(!fat.fornitore||!fat.data||!fat.numero)throw new Error('Dati fornitore, data o numero mancanti');
+        records.push({file,fat,chiave:chiaveUnivocaFattura(fat)});
+      }catch(e){errors.push(`${file.name}: ${e.message||'XML non valido'}`);}
+      lette++;
+      if(lette%5===0||lette===files.length){
+        aggiornaStatoImportazione({titolo:'Lettura file XML…',corrente:lette,totale:files.length,fase:'lettura',riepilogo:`${records.length} validi · ${errors.length} non leggibili`,errori:errors});
+        await new Promise(resolve=>setTimeout(resolve,0));
       }
-    });
-  }
-
-  for (const [key, val] of Object.entries(ASSOCIAZIONI)) {
-    const storageId = key.includes('|') ? await idAssociazione(key) : key;
-    await window._save('associazioni', storageId, val);
-  }
+    }
+    records.sort((a,b)=>a.fat.data.localeCompare(b.fat.data)||a.fat.numero.localeCompare(b.fat.numero));
+    const presenti=new Set(Object.values(FATTURE).map(chiaveUnivocaFattura));
+    const viste=new Set();
+    const chiaveAssoc=new Map();
+    for(const [storageId,val] of Object.entries(ASSOCIAZIONI))if(val.descrizione&&val.fornitore)chiaveAssoc.set(val.descrizione+'|'+val.fornitore,storageId);
+    const dirtyAssoc=new Set();
+    for(let i=0;i<records.length;i++){
+      const {file,fat,chiave}=records[i];
+      if(viste.has(chiave)){duplicateNelCaricamento++;continue;}
+      viste.add(chiave);
+      if(presenti.has(chiave)){giaPresenti++;}
+      else{
+        const id=idFattura(fat);
+        fat.nomeFile=file.name;
+        fat.caricata=new Date().toISOString();
+        try{await window._save('fatture',id,fat);FATTURE[id]=fat;presenti.add(chiave);caricate++;}
+        catch(e){errors.push(`${file.name}: salvataggio fattura non riuscito — ${e.message||e}`);}
+      }
+      fat.righe.forEach(r=>{
+        const key=r.desc+'|'+fat.fornitore, storageId=chiaveAssoc.get(key);
+        if(storageId){
+          ASSOCIAZIONI[storageId].ultimoPrezzo=r.pu;
+          ASSOCIAZIONI[storageId].ultimaQty=r.qty;
+          const history=ASSOCIAZIONI[storageId].storicoPrezzi||[];
+          history.push({data:fat.data,prezzo:r.pu});
+          ASSOCIAZIONI[storageId].storicoPrezzi=history.slice(-12);
+          ASSOCIAZIONI[storageId].aggiornato=new Date().toISOString();
+          dirtyAssoc.add(storageId);
+        }else{
+          chiaveAssoc.set(key,key);
+          ASSOCIAZIONI[key]={descrizione:r.desc,fornitore:fat.fornitore,piva:fat.piva,um_fattura:r.um,ultimoPrezzo:r.pu,ultimaQty:r.qty,storicoPrezzi:[{data:fat.data,prezzo:r.pu}],ingId:null,pezzi:1,qty:1,um:'KG',aggiornato:new Date().toISOString()};
+          dirtyAssoc.add(key);
+        }
+      });
+      if((i+1)%5===0||i+1===records.length){
+        aggiornaStatoImportazione({titolo:'Salvataggio fatture…',corrente:i+1,totale:records.length,fase:'fatture',riepilogo:`${caricate} nuove · ${giaPresenti+duplicateNelCaricamento} già presenti · ${errors.length} errori`,errori:errors});
+        await new Promise(resolve=>setTimeout(resolve,0));
+      }
+    }
+    const associazioni=[...dirtyAssoc];
+    for(let i=0;i<associazioni.length;i++){
+      const storageId=associazioni[i], val=ASSOCIAZIONI[storageId];
+      try{await window._save('associazioni',storageId.includes('|')?await idAssociazione(storageId):storageId,val);associazioniAggiornate++;}
+      catch(e){errors.push(`${val.descrizione} · ${val.fornitore}: associazione non salvata — ${e.message||e}`);}
+      if((i+1)%10===0||i+1===associazioni.length){
+        aggiornaStatoImportazione({titolo:'Aggiornamento associazioni…',corrente:i+1,totale:associazioni.length,fase:'associazioni',riepilogo:`${associazioniAggiornate} aggiornate · ${errors.length} errori`,errori:errors});
+        await new Promise(resolve=>setTimeout(resolve,0));
+      }
+    }
+    renderFatture();renderAssociazioni();await aggiornaCostiDaAssociazioni();
+    const riepilogo=`${caricate} nuove · ${giaPresenti} già archiviate · ${duplicateNelCaricamento} ripetute nella selezione · ${associazioniAggiornate} associazioni aggiornate · ${errors.length} errori`;
+    aggiornaStatoImportazione({titolo:errors.length?'Importazione completata con errori':'Importazione completata',corrente:files.length+associazioni.length,totale:files.length+associazioni.length,fase:'completata',riepilogo,errori:errors});
+  }catch(e){
+    errors.push(`Errore generale: ${e.message||e}`);
+    aggiornaStatoImportazione({titolo:'Importazione interrotta',corrente:lette,totale:files.length,fase:'errore',riepilogo:`${caricate} fatture salvate prima dell’interruzione`,errori:errors});
+  }finally{uploadButtons.forEach(b=>b.disabled=false);}
+}
+function aggiornaSelezioneFatture(){
+  const count=FATTURE_SELEZIONATE.size;
+  document.getElementById('fat-selected-count').textContent=count;
+  document.getElementById('btn-delete-selected-invoices').disabled=count===0;
+}
+function toggleFatturaSelezionata(id,checked){
+  checked?FATTURE_SELEZIONATE.add(id):FATTURE_SELEZIONATE.delete(id);
+  aggiornaSelezioneFatture();
+}
+async function eliminaFattureSelezionate(){
+  const ids=[...FATTURE_SELEZIONATE].filter(id=>FATTURE[id]);
+  if(!ids.length)return;
+  if(!confirm(`Eliminare ${ids.length} fatture selezionate? Le associazioni e le ricette resteranno.`))return;
+  const btn=document.getElementById('btn-delete-selected-invoices');
+  btn.disabled=true;btn.textContent='⏳ Eliminazione…';
+  let deleted=0;const errors=[];
+  for(const id of ids){try{await window._del('fatture',id);delete FATTURE[id];FATTURE_SELEZIONATE.delete(id);deleted++;}catch(e){errors.push(`${FATTURE[id]?.nomeFile||id}: ${e.message||e}`);}}
   renderFatture();
-  renderAssociazioni();
-  aggiornaCostiDaAssociazioni();
-  if (files.length) alert(`${caricate} fatture caricate, ${giaPresenti} già presenti; associazioni aggiornate.`);
+  btn.textContent='🗑 Elimina selezionate';
+  alert(`${deleted} fatture eliminate${errors.length?'; '+errors.length+' errori':''}.`);
 }
 
 async function eliminaTutteFatture() {
@@ -1139,35 +1225,38 @@ async function eliminaTutteFatture() {
 }
 
 function renderFatture() {
-  const list = document.getElementById('fat-list');
-  const empty = document.getElementById('fat-empty');
-  const clearBtn = document.getElementById('btn-delete-all-invoices');
-  if (clearBtn) clearBtn.disabled = Object.keys(FATTURE).length === 0;
-  const search = document.getElementById('fat-search').value.toLowerCase();
-  let items = Object.entries(FATTURE).sort((a,b)=>b[1].data.localeCompare(a[1].data));
-  if (search) items = items.filter(([,v])=>(v.fornitore||'').toLowerCase().includes(search));
-
-  const totFornitori = new Set(Object.values(FATTURE).map(f=>f.fornitore)).size;
-  const totImporto = Object.values(FATTURE).reduce((s,f)=>s+f.totale,0);
-  document.getElementById('fat-stats').innerHTML =
-    `<div class="stat-item"><div class="stat-label">Fatture</div><div class="stat-value">${Object.keys(FATTURE).length}</div></div>` +
-    `<div class="stat-item"><div class="stat-label">Fornitori</div><div class="stat-value">${totFornitori}</div></div>` +
-    `<div class="stat-item"><div class="stat-label">Importo totale</div><div class="stat-value">${fmt(totImporto)}</div></div>`;
-
-  if (!items.length) { list.innerHTML=''; empty.style.display='block'; return; }
+  const list=document.getElementById('fat-list'),empty=document.getElementById('fat-empty');
+  const clearBtn=document.getElementById('btn-delete-all-invoices');
+  if(clearBtn)clearBtn.disabled=Object.keys(FATTURE).length===0;
+  const search=(document.getElementById('fat-search').value||'').toLowerCase();
+  const filter=document.getElementById('fat-status-filter')?.value||'tutti';
+  let items=Object.entries(FATTURE).sort((a,b)=>b[1].data.localeCompare(a[1].data));
+  if(search)items=items.filter(([,v])=>(v.fornitore||'').toLowerCase().includes(search)||(v.numero||'').toLowerCase().includes(search));
+  const daAssociare=f=>f.righe?f.righe.filter(r=>!ASSOCIAZIONI[r.desc+'|'+f.fornitore]?.ingId).length:0;
+  if(filter==='da_associare')items=items.filter(([,f])=>daAssociare(f)>0);
+  if(filter==='complete')items=items.filter(([,f])=>daAssociare(f)===0);
+  const tutte=Object.values(FATTURE),totFornitori=new Set(tutte.map(f=>f.fornitore)).size,totImporto=tutte.reduce((s,f)=>s+(Number(f.totale)||0),0);
+  const righeDaAssociare=tutte.reduce((s,f)=>s+daAssociare(f),0);
+  document.getElementById('fat-stats').innerHTML=
+    `<div class="stat-item"><div class="stat-label">Fatture</div><div class="stat-value">${tutte.length}</div></div>`+
+    `<div class="stat-item"><div class="stat-label">Fornitori</div><div class="stat-value">${totFornitori}</div></div>`+
+    `<div class="stat-item"><div class="stat-label">Importo totale</div><div class="stat-value">${fmt(totImporto)}</div></div>`+
+    `<div class="stat-item"><div class="stat-label">Righe da associare</div><div class="stat-value" style="color:${righeDaAssociare?'var(--accent)':'var(--green)'}">${righeDaAssociare}</div></div>`;
+  aggiornaSelezioneFatture();
+  if(!items.length){list.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
-
-  list.innerHTML = items.map(([id,f]) => {
-    const daAssociare = f.righe ? f.righe.filter(r=>!ASSOCIAZIONI[r.desc+'|'+f.fornitore]?.ingId).length : 0;
+  list.innerHTML=items.map(([id,f])=>{
+    const pending=daAssociare(f);
     return `<div class="fattura-card" onclick="apriDettaglioFattura('${id}')">
       <div class="fattura-header">
-        <div>
+        <div class="fattura-select-cell"><input class="fattura-select" type="checkbox" aria-label="Seleziona fattura ${f.numero}" ${FATTURE_SELEZIONATE.has(id)?'checked':''} onclick="event.stopPropagation()" onchange="toggleFatturaSelezionata('${id}',this.checked)"></div>
+        <div style="flex:1;min-width:180px">
           <div class="fattura-fornitore">${f.fornitore}</div>
           <div class="fattura-meta">${f.data} &nbsp;·&nbsp; n. ${f.numero} &nbsp;·&nbsp; ${f.righe?.length||0} articoli</div>
         </div>
         <div style="text-align:right">
           <div class="fattura-totale">${fmt(f.totale)}</div>
-          ${daAssociare>0?`<span class="badge-new">${daAssociare} da associare</span>`:'<span class="badge-ok">✓ Completa</span>'}
+          ${pending>0?`<span class="badge-new">${pending} da associare</span>`:'<span class="badge-ok">✓ Completa</span>'}
         </div>
       </div>
     </div>`;
