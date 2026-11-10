@@ -1099,6 +1099,13 @@ body.light .emoji-btn { background: #e8eaed; }
     <div class="card"><div class="card-label">Marg. effettivo</div><div class="card-value" id="s-marg-eff">—</div><div class="progress-bar-wrap"><div class="progress-bar-fill" id="s-progress" style="width:0%"></div></div></div>
     <div class="card full"><div class="card-label">Top 5 categorie per quantità</div><div id="top5-bars" style="margin-top:0.5rem"></div></div>
   </div>
+  <div class="section-title">Classifica prodotti</div>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem">
+    <select id="rank-category" class="select" onchange="renderClassificaProdotti()" style="width:auto"><option value="">Tutte le categorie</option></select>
+    <select id="rank-metric" class="select" onchange="renderClassificaProdotti()" style="width:auto"><option value="qty">Più venduti</option><option value="incasso">Per incasso</option><option value="margine">Per margine</option></select>
+    <input id="rank-search" class="fc-search" placeholder="Cerca prodotto..." oninput="renderClassificaProdotti()" style="max-width:240px">
+  </div>
+  <div style="overflow-x:auto"><table class="stat-table"><thead><tr><th>#</th><th>Prodotto</th><th>Categoria</th><th>Q.tà</th><th>Incasso</th><th>Margine</th></tr></thead><tbody id="rank-products-body"></tbody></table></div>
   <details style="margin:0.5rem 0 1rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:0.6rem 0.9rem">
     <summary style="cursor:pointer;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2)">Apri classifiche dettagliate per categoria</summary>
     <div style="padding-top:.8rem">
@@ -2407,6 +2414,39 @@ function buildUI() {
   if(bep>0){const p=Math.min(100,(totImponibile/bep)*100);document.getElementById('s-progress').style.width=p+'%';document.getElementById('s-progress').style.background=p>=100?'var(--green)':'var(--accent)';}
   buildTop5Bars();
   buildDashboardButtons();
+  renderClassificaProdotti();
+}
+
+function renderClassificaProdotti() {
+  const body=document.getElementById('rank-products-body');
+  const category=document.getElementById('rank-category');
+  const metric=document.getElementById('rank-metric')?.value||'qty';
+  const search=(document.getElementById('rank-search')?.value||'').toLocaleLowerCase('it');
+  if(!body||!category||!CURRENT_DATA)return;
+  const rows=CURRENT_DATA.chiusura.filter(r=>!CATEGORIE_ESCLUSE.includes(r.cat)&&r.prodotto);
+  const cats=[...new Set(rows.map(r=>r.cat||'N/D'))].sort((a,b)=>a.localeCompare(b,'it'));
+  const current=category.value;
+  category.innerHTML='<option value="">Tutte le categorie</option>'+cats.map(c=>'<option value="'+c.replace(/"/g,'&quot;')+'">'+c.replace(/--/g,'').trim()+'</option>').join('');
+  category.value=cats.includes(current)?current:'';
+  const grouped=new Map();
+  rows.filter(r=>(!category.value||(r.cat||'N/D')===category.value)&&(!search||String(r.prodotto).toLocaleLowerCase('it').includes(search))).forEach(r=>{
+    const key=(r.cat||'N/D')+'|'+r.prodotto;
+    const x=grouped.get(key)||{prodotto:r.prodotto,cat:r.cat||'N/D',qty:0,incasso:0,margine:0};
+    x.qty+=Number(r.qty)||0;
+    x.incasso+=Number(r.imponibile)||Number(r.totale)||0;
+    x.margine+=Number(r.margineEuro)||0;
+    grouped.set(key,x);
+  });
+  const data=[...grouped.values()].sort((a,b)=>b[metric]-a[metric]).slice(0,10);
+  body.replaceChildren();
+  data.forEach((x,i)=>{
+    const tr=document.createElement('tr');
+    [String(i+1),String(x.prodotto),String(x.cat).replace(/--/g,'').trim(),x.qty.toLocaleString('it-IT'),fmt(x.incasso),fmt(x.margine)].forEach((value,j)=>{
+      const td=document.createElement('td');td.textContent=value;if(j>=3)td.style.textAlign='right';tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+  if(!data.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=6;td.textContent='Nessun prodotto nei filtri selezionati';tr.appendChild(td);body.appendChild(tr);}
 }
 
 function buildTop5Bars() {
