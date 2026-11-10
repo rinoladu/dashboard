@@ -897,7 +897,7 @@ async function sincronizzaRicetteChiusure(){
     const imp=Number(r.imponibile),netto=imp>0?imp:(totale>0?totale/1.10:0);
     const p=prodotti.get(key)||{nome,categoria:String(r.cat||'').trim(),codice:String(r.cod||'').trim(),prezzo:0,peso:0,prezzoNetto:0,pesoNetto:0,nettoStimato:false,data:''};
     if(totale>0){p.prezzo+=totale;p.peso+=qty;}
-    if(netto>0){p.prezzoNetto+=netto;p.pesoNetto+=qty;if(r.imponibileStimato!==false)p.nettoStimato=true;}
+    if(netto>0){p.prezzoNetto+=netto;p.pesoNetto+=qty;if(r.imponibileStimato===true)p.nettoStimato=true;}
     const d=String(c.data||'');
     if(d>=p.data){p.data=d;p.nome=nome;if(r.cat)p.categoria=String(r.cat).trim();if(r.cod)p.codice=String(r.cod).trim();}
     prodotti.set(key,p);
