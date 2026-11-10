@@ -1433,17 +1433,17 @@ function apriModalAssociazione(storageId) {
 }
 
 function cercaIngredienteAssoc(val) {
+  document.getElementById('ass-ing-id').value = '';
   const sug = document.getElementById('ass-ing-suggestions');
-  if (!val || val.length<2) { sug.style.display='none'; return; }
+  if (!val || val.trim().length<2) { sug.style.display='none'; return; }
   const matches = Object.entries(INGREDIENTI)
     .filter(([,v])=>v.nome.toLowerCase().includes(val.toLowerCase()))
     .slice(0,8);
-  if (!matches.length) { sug.style.display='none'; return; }
   sug.style.display='block';
   sug.innerHTML = matches.map(([id,v])=>
     `<div onclick="selezionaIngAssoc('${id}','${v.nome}')" style="padding:0.5rem 0.8rem;cursor:pointer;font-size:0.85rem;border-bottom:1px solid var(--border)" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''">${v.nome} <span style="color:var(--text3);font-size:0.72rem">${v.um} · ${fmt(v.costoUnit)}</span></div>`
   ).join('') +
-  `<div onclick="creaIngredienteDaAssoc('${val}')" style="padding:0.5rem 0.8rem;cursor:pointer;font-size:0.82rem;color:var(--accent);border-top:1px solid var(--border)">+ Crea "${val}" come nuovo ingrediente</div>`;
+  `<div onclick="creaIngredienteDaAssoc()" style="padding:0.5rem 0.8rem;cursor:pointer;font-size:0.82rem;color:var(--accent);border-top:1px solid var(--border)">+ Crea "${val.trim()}" e associa al salvataggio</div>`;
 }
 
 function selezionaIngAssoc(id, nome) {
@@ -1453,12 +1453,13 @@ function selezionaIngAssoc(id, nome) {
   aggiornaPreviewAssoc();
 }
 
-function creaIngredienteDaAssoc(nome) {
+function creaIngredienteDaAssoc() {
+  const input=document.getElementById('ass-ing-search');
+  input.value=input.value.trim();
+  document.getElementById('ass-ing-id').value='';
   document.getElementById('ass-ing-suggestions').style.display='none';
-  closeModal('ov-ass');
-  apriModalIngrediente();
-  document.getElementById('ing-nome').value = nome;
-  document.getElementById('ass-ing-search').dataset.pendingNome = nome;
+  document.getElementById('ass-err').textContent='';
+  aggiornaPreviewAssoc();
 }
 
 function aggiornaPreviewAssoc() {
@@ -1482,9 +1483,10 @@ document.getElementById('ass-um').addEventListener('change', aggiornaPreviewAsso
 
 async function salvaAssociazione() {
   const storageId = document.getElementById('ass-edit-key').value;
-  const ingId = document.getElementById('ass-ing-id').value;
+  let ingId = document.getElementById('ass-ing-id').value;
+  const nomeIngrediente = document.getElementById('ass-ing-search').value.trim();
   const err = document.getElementById('ass-err');
-  if (!ingId) { err.textContent = 'Seleziona o crea un ingrediente'; return; }
+  if (!ingId && !nomeIngrediente) { err.textContent = 'Inserisci il nome dell’ingrediente'; return; }
   const v = ASSOCIAZIONI[storageId];
   if (!v) return;
   const pezzi = parseFloat(document.getElementById('ass-pezzi').value)||1;
@@ -1495,8 +1497,19 @@ async function salvaAssociazione() {
   const totUm = qty * pezzi;
   const costoPerUm = totUm>0 ? costoTotale/totUm : 0;
 
-  const updated = { ...v, ingId, pezzi, qty, um, costoPerUm, aggiornato: new Date().toISOString() };
   try {
+    if (!ingId) {
+      const nomeKey = nomeIngrediente.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+      const trovato = Object.entries(INGREDIENTI).find(([,ing])=>ing.nome.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()===nomeKey);
+      if (trovato) ingId=trovato[0];
+      else {
+        ingId=uid();
+        const nuovoIngrediente={nome:nomeIngrediente,categoria:'',um,costoUnit:costoPerUm,scarto:0,note:'Creato dall’associazione fattura',aggiornato:new Date().toISOString()};
+        await window._save('ingredienti',ingId,nuovoIngrediente);
+        INGREDIENTI[ingId]=nuovoIngrediente;
+      }
+    }
+    const updated = { ...v, ingId, pezzi, qty, um, costoPerUm, aggiornato: new Date().toISOString() };
     await window._save('associazioni', storageId, updated);
     ASSOCIAZIONI[storageId] = updated;
     // Aggiorna costo ingrediente
