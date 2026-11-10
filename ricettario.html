@@ -1051,53 +1051,70 @@ function chiaveUnivocaFattura(fat) {
     .join('|');
 }
 
+async function idAssociazione(key) {
+  const encoded = btoa(unescape(encodeURIComponent(key))).replace(/=/g, '');
+  if (encoded.length <= 1400) return encoded;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
+  const hex = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+  return 'sha256_' + hex;
+}
+
 async function caricaFattureXML(event) {
   const files = Array.from(event.target.files);
   event.target.value = '';
+  const records = [];
+  for (const file of files) {
+    const fat = parseXMLFattura(await file.text());
+    records.push({ file, fat, chiave: chiaveUnivocaFattura(fat) });
+  }
+  records.sort((a, b) => a.fat.data.localeCompare(b.fat.data) || a.fat.numero.localeCompare(b.fat.numero));
+
   const presenti = new Set(Object.values(FATTURE).map(chiaveUnivocaFattura));
+  const chiaveAssoc = new Map();
+  for (const [storageId, val] of Object.entries(ASSOCIAZIONI)) {
+    if (val.descrizione && val.fornitore) chiaveAssoc.set(val.descrizione + '|' + val.fornitore, storageId);
+  }
   let caricate = 0;
   let giaPresenti = 0;
-  for (const file of files) {
-    const text = await file.text();
-    const fat = parseXMLFattura(text);
-    const chiave = chiaveUnivocaFattura(fat);
-    if (presenti.has(chiave)) {
+  for (const { file, fat, chiave } of records) {
+    const giaPresente = presenti.has(chiave);
+    if (giaPresente) {
       giaPresenti++;
-      continue;
+    } else {
+      const id = idFattura(fat);
+      fat.nomeFile = file.name;
+      fat.caricata = new Date().toISOString();
+      await window._save('fatture', id, fat);
+      FATTURE[id] = fat;
+      presenti.add(chiave);
+      caricate++;
     }
-    const id = idFattura(fat);
-    fat.nomeFile = file.name;
-    fat.caricata = new Date().toISOString();
-    fat.nuoviArticoli = fat.righe.filter(r => !ASSOCIAZIONI[r.desc+'|'+fat.fornitore]).length;
-    await window._save('fatture', id, fat);
-    FATTURE[id] = fat;
-    presenti.add(chiave);
-    caricate++;
-    // Aggiungi articoli non ancora in associazioni
+
     fat.righe.forEach(r => {
-      const key = r.desc+'|'+fat.fornitore;
-      if (!ASSOCIAZIONI[key]) {
+      const key = r.desc + '|' + fat.fornitore;
+      const storageId = chiaveAssoc.get(key);
+      if (storageId) {
+        ASSOCIAZIONI[storageId].ultimoPrezzo = r.pu;
+        ASSOCIAZIONI[storageId].ultimaQty = r.qty;
+      } else {
+        chiaveAssoc.set(key, key);
         ASSOCIAZIONI[key] = {
           descrizione: r.desc, fornitore: fat.fornitore, piva: fat.piva,
           um_fattura: r.um, ultimoPrezzo: r.pu, ultimaQty: r.qty,
           ingId: null, pezzi:1, qty:1, um:'KG', aggiornato: new Date().toISOString()
         };
-      } else {
-        // Aggiorna prezzo
-        ASSOCIAZIONI[key].ultimoPrezzo = r.pu;
-        ASSOCIAZIONI[key].ultimaQty = r.qty;
       }
     });
   }
-  // Salva associazioni aggiornate
+
   for (const [key, val] of Object.entries(ASSOCIAZIONI)) {
-    await window._save('associazioni', btoa(unescape(encodeURIComponent(key))).replace(/=/g,''), val);
+    const storageId = key.includes('|') ? await idAssociazione(key) : key;
+    await window._save('associazioni', storageId, val);
   }
   renderFatture();
   renderAssociazioni();
-  // Ricalcola costi ingredienti
   aggiornaCostiDaAssociazioni();
-  if (files.length) alert(`${caricate} fatture caricate, ${giaPresenti} già presenti ignorate.`);
+  if (files.length) alert(`${caricate} fatture caricate, ${giaPresenti} già presenti; associazioni aggiornate.`);
 }
 
 async function eliminaTutteFatture() {
