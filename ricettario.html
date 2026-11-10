@@ -629,6 +629,7 @@ window.selezionaLocaleRic = async (localeId, localeNome) => {
   if (sub) sub.textContent = localeNome;
   await Promise.all([caricaIngredienti(), caricaRicette(), caricaFatture(), caricaAssociazioni()]);
   await sincronizzaAssociazioniIdentiche();
+  await aggiornaCostiDaAssociazioni();
   initAliasMap();
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -1561,9 +1562,10 @@ function creaIngredienteDaAssoc() {
 }
 
 function costoBaseDaAssociazione(assoc,pezzi,qty,tipoConversione){
-  const totale=(Number(assoc.ultimoPrezzo)||0)*(Number(assoc.ultimaQty)||1);
-  if(tipoConversione==='peso')return totale/(Number(assoc.ultimaQty)||1);
-  const totaleUnita=(Number(pezzi)||1)*(Number(qty)||1);
+  const quantitaFattura=Number(assoc.ultimaQty)||1;
+  const totale=(Number(assoc.ultimoPrezzo)||0)*quantitaFattura;
+  if(tipoConversione==='peso')return totale/quantitaFattura;
+  const totaleUnita=quantitaFattura*(Number(pezzi)||1)*(Number(qty)||1);
   return totaleUnita>0?totale/totaleUnita:0;
 }
 function aggiornaUIConversioneAssoc(){
@@ -1591,7 +1593,7 @@ function aggiornaPreviewAssoc() {
   const el = document.getElementById('ass-costo-preview');
   el.innerHTML = tipoConversione==='peso'
     ? `Costo calcolato: <strong style="color:var(--accent)">${fmt(costoPer)} / KG</strong> &nbsp;(prezzo unitario a peso)`
-    : `Costo calcolato: <strong style="color:var(--accent)">${fmt(costoPer)} / ${um}</strong> &nbsp;(${fmt(costoTotale)} ÷ ${qty*pezzi} ${um})`;
+    : `Costo calcolato: <strong style="color:var(--accent)">${fmt(costoPer)} / ${um}</strong> &nbsp;(${fmt(costoTotale)} ÷ (${v.ultimaQty||1} ${v.um_fattura||'PZ'} × ${pezzi} × ${qty} ${um}))`;
 }
 
 document.getElementById('ass-pezzi').addEventListener('input', aggiornaPreviewAssoc);
@@ -1728,7 +1730,10 @@ function initAliasMap() {
 async function aggiornaCostiDaAssociazioni() {
   const piuRecenti=new Map();
   for(const assoc of Object.values(ASSOCIAZIONI)){
-    if(!assoc.ingId||!Number(assoc.costoPerUm))continue;
+    if(!assoc.ingId||!INGREDIENTI[assoc.ingId])continue;
+    const costo=costoBaseDaAssociazione(assoc,assoc.pezzi||1,assoc.qty||1,assoc.tipoConversione||'standard');
+    if(costo>0)assoc.costoPerUm=costo;
+    if(!costo)continue;
     const data=(assoc.storicoPrezzi||[]).reduce((max,h)=>h.data&&h.data>max?h.data:max,'')||assoc.aggiornato||'';
     const prev=piuRecenti.get(assoc.ingId);
     if(!prev||data>=prev.data)piuRecenti.set(assoc.ingId,{data,assoc});
