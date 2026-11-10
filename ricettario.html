@@ -851,7 +851,7 @@ let CHIUSURE_CACHE = [];
 let importChiusureTimer = null;
 let importChiusureQueue = Promise.resolve();
 function chiaveProdottoRic(nome) {
-  return String(nome||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+  return String(nome||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
 }
 function idProdottoRic(key) {
   let h=2166136261;
