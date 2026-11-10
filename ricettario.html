@@ -489,7 +489,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     </div>
     <div class="section-title" style="margin-top:0.5rem">Conversione unità</div>
     <div style="font-size:0.75rem;color:var(--text3);margin-bottom:0.6rem">
-      Quante unità base contiene il formato acquistato? (es. bottiglia 0,7 LT → metti 0.7 in LT)
+      <span id="ass-conv-help">Quante unità base contiene il formato acquistato? (es. bottiglia 0,7 LT → metti 0.7 in LT)</span>
     </div>
     <div class="form-row-3">
       <div class="form-row">
@@ -504,6 +504,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="form-label">Unità di misura</div>
         <select class="select" id="ass-um">
           <option value="KG">KG</option>
+          <option value="KG_PESO">KG a peso · prezzo €/kg</option>
           <option value="LT">LT</option>
           <option value="PZ">PZ</option>
         </select>
@@ -1521,9 +1522,9 @@ function apriModalAssociazione(storageId) {
   document.getElementById('ass-ing-id').value = v.ingId||'';
   document.getElementById('ass-pezzi').value = v.pezzi||1;
   document.getElementById('ass-qty').value = v.qty||1;
-  document.getElementById('ass-um').value = v.um||'KG';
+  document.getElementById('ass-um').value = v.tipoConversione==='peso'?'KG_PESO':(v.um||'KG');
   document.getElementById('ass-ing-suggestions').style.display='none';
-  aggiornaPreviewAssoc();
+  aggiornaUIConversioneAssoc();
   openModal('ov-ass');
   setTimeout(()=>document.getElementById('ass-ing-search').focus(),200);
 }
@@ -1558,24 +1559,43 @@ function creaIngredienteDaAssoc() {
   aggiornaPreviewAssoc();
 }
 
+function costoBaseDaAssociazione(assoc,pezzi,qty,tipoConversione){
+  const totale=(Number(assoc.ultimoPrezzo)||0)*(Number(assoc.ultimaQty)||1);
+  if(tipoConversione==='peso')return totale/(Number(assoc.ultimaQty)||1);
+  const totaleUnita=(Number(pezzi)||1)*(Number(qty)||1);
+  return totaleUnita>0?totale/totaleUnita:0;
+}
+function aggiornaUIConversioneAssoc(){
+  const select=document.getElementById('ass-um');
+  const pezziEl=document.getElementById('ass-pezzi'),qtyEl=document.getElementById('ass-qty');
+  const peso=select.value==='KG_PESO';
+  if(peso&&!select.dataset.pesoMode){select.dataset.prevPezzi=pezziEl.value;select.dataset.prevQty=qtyEl.value;pezziEl.value=1;qtyEl.value=1;}
+  if(!peso&&select.dataset.pesoMode){pezziEl.value=select.dataset.prevPezzi||1;qtyEl.value=select.dataset.prevQty||1;}
+  pezziEl.disabled=peso;qtyEl.disabled=peso;select.dataset.pesoMode=peso?'1':'';
+  document.getElementById('ass-conv-help').textContent=peso
+    ? 'La fattura è già espressa a peso: usa il prezzo unitario in €/kg. Non applico conversioni per collo o pezzo.'
+    : 'Quante unità base contiene il formato acquistato? (es. bottiglia 0,7 LT → metti 0.7 in LT)';
+  aggiornaPreviewAssoc();
+}
 function aggiornaPreviewAssoc() {
   const v = ASSOCIAZIONI[document.getElementById('ass-edit-key').value];
   if (!v) return;
   const pezzi = parseFloat(document.getElementById('ass-pezzi').value)||1;
   const qty = parseFloat(document.getElementById('ass-qty').value)||1;
-  const um = document.getElementById('ass-um').value;
-  const costoTotale = v.ultimoPrezzo * v.ultimaQty; // costo per collo
-  const totUm = qty * pezzi;
-  const costoPer = totUm>0 ? costoTotale/totUm : 0;
+  const modalUm=document.getElementById('ass-um').value;
+  const tipoConversione=modalUm==='KG_PESO'?'peso':'standard';
+  const um=tipoConversione==='peso'?'KG':modalUm;
+  const costoTotale=(Number(v.ultimoPrezzo)||0)*(Number(v.ultimaQty)||1);
+  const costoPer=costoBaseDaAssociazione(v,pezzi,qty,tipoConversione);
   const el = document.getElementById('ass-costo-preview');
-  el.innerHTML = totUm>0
-    ? `Costo calcolato: <strong style="color:var(--accent)">${fmt(costoPer)} / ${um}</strong> &nbsp;(${fmt(costoTotale)} ÷ ${totUm} ${um})`
-    : '';
+  el.innerHTML = tipoConversione==='peso'
+    ? `Costo calcolato: <strong style="color:var(--accent)">${fmt(costoPer)} / KG</strong> &nbsp;(prezzo unitario a peso)`
+    : `Costo calcolato: <strong style="color:var(--accent)">${fmt(costoPer)} / ${um}</strong> &nbsp;(${fmt(costoTotale)} ÷ ${qty*pezzi} ${um})`;
 }
 
 document.getElementById('ass-pezzi').addEventListener('input', aggiornaPreviewAssoc);
 document.getElementById('ass-qty').addEventListener('input', aggiornaPreviewAssoc);
-document.getElementById('ass-um').addEventListener('change', aggiornaPreviewAssoc);
+document.getElementById('ass-um').addEventListener('change', aggiornaUIConversioneAssoc);
 
 async function salvaAssociazione() {
   const storageId = document.getElementById('ass-edit-key').value;
@@ -1585,13 +1605,12 @@ async function salvaAssociazione() {
   if (!ingId && !nomeIngrediente) { err.textContent = 'Inserisci il nome dell’ingrediente'; return; }
   const v = ASSOCIAZIONI[storageId];
   if (!v) return;
-  const pezzi = parseFloat(document.getElementById('ass-pezzi').value)||1;
-  const qty = parseFloat(document.getElementById('ass-qty').value)||1;
-  const um = document.getElementById('ass-um').value;
-  // Calcola costo per unità base
-  const costoTotale = v.ultimoPrezzo * v.ultimaQty;
-  const totUm = qty * pezzi;
-  const costoPerUm = totUm>0 ? costoTotale/totUm : 0;
+  const modalUm=document.getElementById('ass-um').value;
+  const tipoConversione=modalUm==='KG_PESO'?'peso':'standard';
+  const pezzi=tipoConversione==='peso'?1:(parseFloat(document.getElementById('ass-pezzi').value)||1);
+  const qty=tipoConversione==='peso'?1:(parseFloat(document.getElementById('ass-qty').value)||1);
+  const um=tipoConversione==='peso'?'KG':modalUm;
+  const costoPerUm=costoBaseDaAssociazione(v,pezzi,qty,tipoConversione);
 
   try {
     if (!ingId) {
