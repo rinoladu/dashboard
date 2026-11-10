@@ -631,7 +631,7 @@ window.selezionaLocaleRic = async (localeId, localeNome) => {
 };
 
 window.cambiaLocaleRic = () => {
-  INGREDIENTI={}; RICETTE={}; FATTURE={}; ASSOCIAZIONI={}; ALIAS_MAP={};
+  INGREDIENTI={}; RICETTE={}; FATTURE={}; FATTURE_SELEZIONATE.clear(); ASSOCIAZIONI={}; ALIAS_MAP={};
   document.getElementById('app').style.display = 'none';
   document.getElementById('locale-screen').style.display = 'flex';
 };
@@ -1106,7 +1106,7 @@ async function caricaFattureXML(event) {
   const input=event.target, files=Array.from(input.files||[]);
   input.value='';
   if(!files.length)return;
-  const uploadButtons=[...document.querySelectorAll('#p-fatture .toolbar button')];
+  const uploadButtons=[...document.querySelectorAll('#p-fatture .toolbar button[onclick*="xml-input"],#p-fatture .toolbar button[onclick*="xml-folder-input"]')];
   uploadButtons.forEach(b=>b.disabled=true);
   const errors=[], records=[];
   let lette=0, caricate=0, giaPresenti=0, duplicateNelCaricamento=0, associazioniAggiornate=0;
@@ -1214,6 +1214,7 @@ async function eliminaTutteFatture() {
   try {
     const deleted = await window._deleteAll('fatture');
     FATTURE = {};
+    FATTURE_SELEZIONATE.clear();
     renderFatture();
     alert(`${deleted} fatture eliminate. Ora puoi reimportare i file XML.`);
   } catch(e) {
