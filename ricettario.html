@@ -1422,7 +1422,6 @@ async function sincronizzaAssociazioniIdentiche(){
       const data=x=>(x[1].storicoPrezzi||[]).reduce((m,h)=>h.data&&h.data>m?h.data:m,'');
       return data(b).localeCompare(data(a));
     });
-    const [,,] = [];
     const template=associate[0][1];
     for(const [id,assoc] of righe){
       if(assoc.ingId)continue;
