@@ -846,6 +846,64 @@ async function eliminaIngrediente(id) {
   renderRicette();
 }
 
+
+let CHIUSURE_CACHE = [];
+let importChiusureTimer = null;
+let importChiusureQueue = Promise.resolve();
+function chiaveProdottoRic(nome) {
+  return String(nome||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+}
+function idProdottoRic(key) {
+  let h=2166136261;
+  for(let i=0;i<key.length;i++){h^=key.charCodeAt(i);h=Math.imul(h,16777619);}
+  return 'pos_'+(h>>>0).toString(36);
+}
+function avviaImportChiusure() {
+  const status=document.getElementById('ric-chiusure-status');
+  if(status)status.textContent='Lettura chiusure…';
+  unsubscribeChiusureRic=window._subscribeChiusure((docs,err)=>{
+    if(err){console.error('Import chiusure:',err);if(status)status.textContent='Chiusure non accessibili';return;}
+    CHIUSURE_CACHE=docs||[];
+    clearTimeout(importChiusureTimer);
+    importChiusureTimer=setTimeout(()=>{importChiusureQueue=importChiusureQueue.then(()=>sincronizzaRicetteChiusure()).catch(console.error);},500);
+  });
+}
+window.aggiornaRicetteDaChiusure=async()=>{await importChiusureQueue;await sincronizzaRicetteChiusure();};
+async function sincronizzaRicetteChiusure(){
+  const status=document.getElementById('ric-chiusure-status');
+  if(!window._localeId)return;
+  if(status)status.textContent='Importazione prodotti…';
+  const prodotti=new Map(), ordineTipo={anno:0,mese:1,settimana:2,giorno:3};
+  const docs=[...CHIUSURE_CACHE].sort((a,b)=>String(a.data||'').localeCompare(String(b.data||''))||(ordineTipo[a.tipo]||0)-(ordineTipo[b.tipo]||0));
+  for(const c of docs)for(const r of (c.chiusura||[])){
+    const nome=String(r.prodotto||'').trim(), key=chiaveProdottoRic(nome), qty=Number(r.qty)||0, totale=Number(r.totale)||0, cat=chiaveProdottoRic(r.cat||'');
+    if(!key||qty<=0||cat==='SERVIZIO'||cat==='CLIENTE')continue;
+    const p=prodotti.get(key)||{nome,categoria:String(r.cat||'').trim(),codice:String(r.cod||'').trim(),prezzo:0,peso:0,data:''};
+    if(totale>0){p.prezzo+=totale;p.peso+=qty;}
+    const d=String(c.data||'');
+    if(d>=p.data){p.data=d;p.nome=nome;if(r.cat)p.categoria=String(r.cat).trim();if(r.cod)p.codice=String(r.cod).trim();}
+    prodotti.set(key,p);
+  }
+  const byKey=new Map();
+  for(const [id,r] of Object.entries(RICETTE)){const k=r.prodottoChiave||chiaveProdottoRic(r.nome);if(k&&!byKey.has(k))byKey.set(k,{id,r});}
+  let created=0,updated=0,existing=0;
+  for(const [key,p] of prodotti){
+    const match=byKey.get(key), prezzo=p.peso?p.prezzo/p.peso:0;
+    if(match&&match.r.origine!=='chiusure'){existing++;continue;}
+    if(match){
+      const id=match.id,r=match.r,ultima=String(r.ultimaChiusura||'');
+      const next={...r,nome:p.nome,categoria:r.categoria||p.categoria,codiceVendita:p.codice||r.codiceVendita,prezzoOsservato:prezzo,ultimaChiusura:p.data||ultima};
+      if(!r.prezzoManuale&&p.data>=ultima&&prezzo>0)next.prezzo=prezzo;
+      if(JSON.stringify(next)!==JSON.stringify(r)){await window._save('ricette',id,next);RICETTE[id]=next;updated++;}else existing++;
+    }else{
+      const id=idProdottoRic(key), recipe={nome:p.nome,categoria:p.categoria||'',prezzo,porzioni:1,ingredienti:[],origine:'chiusure',prodottoChiave:key,codiceVendita:p.codice,prezzoOsservato:prezzo,prezzoManuale:false,ultimaChiusura:p.data||'',aggiornato:new Date().toISOString()};
+      await window._save('ricette',id,recipe);RICETTE[id]=recipe;byKey.set(key,{id,r:recipe});created++;
+    }
+  }
+  if(created||updated){renderRicette();costruisciMappaAlias();}
+  if(status)status.textContent=created+' nuove · '+updated+' aggiornate · '+existing+' già presenti';
+}
+
 // ── RICETTE ───────────────────────────────────────────────────────
 function renderRicette() {
   const grid = document.getElementById('ric-grid');
