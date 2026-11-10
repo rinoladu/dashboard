@@ -1671,13 +1671,18 @@ function initAliasMap() {
 }
 
 async function aggiornaCostiDaAssociazioni() {
-  for (const [,assoc] of Object.entries(ASSOCIAZIONI)) {
-    if (!assoc.ingId || !assoc.costoPerUm) continue;
-    const ing = INGREDIENTI[assoc.ingId];
-    if (ing && Math.abs(ing.costoUnit - assoc.costoPerUm) > 0.001) {
-      ing.costoUnit = assoc.costoPerUm;
-      ing.um = assoc.um;
-      await window._save('ingredienti', assoc.ingId, ing);
+  const piuRecenti=new Map();
+  for(const assoc of Object.values(ASSOCIAZIONI)){
+    if(!assoc.ingId||!Number(assoc.costoPerUm))continue;
+    const data=(assoc.storicoPrezzi||[]).reduce((max,h)=>h.data&&h.data>max?h.data:max,'')||assoc.aggiornato||'';
+    const prev=piuRecenti.get(assoc.ingId);
+    if(!prev||data>=prev.data)piuRecenti.set(assoc.ingId,{data,assoc});
+  }
+  for(const [ingId,{assoc}] of piuRecenti){
+    const ing=INGREDIENTI[ingId];
+    if(ing&&(Math.abs((Number(ing.costoUnit)||0)-assoc.costoPerUm)>0.001||ing.um!==assoc.um)){
+      ing.costoUnit=assoc.costoPerUm;ing.um=assoc.um;
+      await window._save('ingredienti',ingId,ing);
     }
   }
   renderIngredienti();
