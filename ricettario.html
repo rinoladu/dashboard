@@ -985,7 +985,7 @@ function renderRicette() {
       <div class="card-cat">${(v.categoria||'').replace(/--/g,'').trim()||'—'}</div>
       <div style="font-size:.68rem;margin:.2rem 0 .45rem;color:${!haIngredienti?'var(--accent)':completo?'var(--green)':'var(--red)'}">${statoRicetta}</div>
       ${prezzo>0?`<div class="card-row">Prezzo cassa IVA incl. <span>${fmt(prezzo)}</span></div>`:''}
-      ${prezzoNetto>0?`<div class="card-row">${nettoStimato?'Imponibile stimato':'Ricavo netto'} <span>${fmt(prezzoNetto)}${nettoStimato?'*':''}</span></div>`:''}
+      ${prezzoNetto>0?`<div class="card-row">${nettoStimato?'Netto stimato ('+(Number(v.aliquotaIva)||10)+'% IVA)':'Ricavo netto'} <span>${fmt(prezzoNetto)}</span></div>`:''}
       <div class="card-row">Costo ingredienti <span>${completo?fmt(costo):'<span style="color:var(--text3)">incompleto</span>'}</span></div>
       ${margine!==null?`<div class="card-row">Margine unitario <span style="color:${margine>=0?'var(--green)':'var(--red)'}">${fmt(margine)}</span></div>`:''}
       ${fcPerc!==null?`<div class="fc-badge ${fcColor(fcPerc)}">Food Cost sul netto ${fmtPerc(fcPerc)}</div>`:'<div class="fc-badge fc-none">Prezzo non impostato</div>'}
