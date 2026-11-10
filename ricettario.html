@@ -1570,14 +1570,25 @@ async function salvaAssociazione() {
         INGREDIENTI[ingId]=nuovoIngrediente;
       }
     }
-    const updated = { ...v, ingId, pezzi, qty, um, costoPerUm, aggiornato: new Date().toISOString() };
-    await window._save('associazioni', storageId, updated);
-    ASSOCIAZIONI[storageId] = updated;
-    // Aggiorna costo ingrediente
-    if (INGREDIENTI[ingId]) {
-      INGREDIENTI[ingId].costoUnit = costoPerUm;
-      INGREDIENTI[ingId].um = um;
-      await window._save('ingredienti', ingId, INGREDIENTI[ingId]);
+    const nomeKey=normalizzaDenominazioneArticolo(v.descrizione);
+    const corrispondenti=Object.entries(ASSOCIAZIONI).filter(([,a])=>normalizzaDenominazioneArticolo(a.descrizione)===nomeKey);
+    if(!corrispondenti.some(([id])=>id===storageId))corrispondenti.push([storageId,v]);
+    const timestamp=new Date().toISOString();
+    let costoIngrediente=costoPerUm, dataCosto='';
+    for(const [id,assoc] of corrispondenti){
+      const totaleAssoc=(Number(assoc.ultimoPrezzo)||0)*(Number(assoc.ultimaQty)||1);
+      const costoAssoc=(pezzi*qty)>0?totaleAssoc/(pezzi*qty):0;
+      const updated={...assoc,ingId,pezzi,qty,um,costoPerUm:costoAssoc,aggiornato:timestamp};
+      const docId=id.includes('|')?await idAssociazione(id):id;
+      await window._save('associazioni',docId,updated);
+      if(docId!==id){delete ASSOCIAZIONI[id];ASSOCIAZIONI[docId]=updated;}else ASSOCIAZIONI[id]=updated;
+      const dateAssoc=(assoc.storicoPrezzi||[]).reduce((max,h)=>h.data&&h.data>max?h.data:max,'');
+      if(dateAssoc>=dataCosto){dataCosto=dateAssoc;costoIngrediente=costoAssoc;}
+    }
+    if(INGREDIENTI[ingId]){
+      INGREDIENTI[ingId].costoUnit=costoIngrediente;
+      INGREDIENTI[ingId].um=um;
+      await window._save('ingredienti',ingId,INGREDIENTI[ingId]);
     }
     closeModal('ov-ass');
     renderAssociazioni();
