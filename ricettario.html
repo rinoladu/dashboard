@@ -1148,7 +1148,8 @@ async function caricaFattureXML(event) {
           ASSOCIAZIONI[storageId].ultimoPrezzo=r.pu;
           ASSOCIAZIONI[storageId].ultimaQty=r.qty;
           const history=ASSOCIAZIONI[storageId].storicoPrezzi||[];
-          history.push({data:fat.data,prezzo:r.pu});
+          const last=history[history.length-1];
+          if(!last||last.data!==fat.data||last.prezzo!==r.pu||last.um!==r.um)history.push({data:fat.data,prezzo:r.pu,um:r.um});
           ASSOCIAZIONI[storageId].storicoPrezzi=history.slice(-12);
           ASSOCIAZIONI[storageId].aggiornato=new Date().toISOString();
           dirtyAssoc.add(storageId);
@@ -1273,6 +1274,25 @@ function apriDettaglioFattura(id) {
 }
 
 // ── ASSOCIAZIONI ──────────────────────────────────────────────────
+function trovaIngredienteSuggerito(storageId){
+  const current=ASSOCIAZIONI[storageId];
+  if(!current)return null;
+  const norm=v=>String(v||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+  const target=norm(current.descrizione);
+  if(!target)return null;
+  for(const [otherId,other] of Object.entries(ASSOCIAZIONI)){
+    if(otherId===storageId||!other.ingId||norm(other.descrizione)!==target)continue;
+    const ing=INGREDIENTI[other.ingId];
+    if(ing)return {ingId:other.ingId,nome:ing.nome};
+  }
+  return null;
+}
+function apriModalAssociazioneSuggerita(storageId,ingId){
+  apriModalAssociazione(storageId);
+  const ing=INGREDIENTI[ingId];
+  if(ing)selezionaIngAssoc(ingId,ing.nome);
+}
+
 function renderAssociazioni() {
   const list = document.getElementById('ass-list');
   const empty = document.getElementById('ass-empty');
@@ -1297,14 +1317,21 @@ function renderAssociazioni() {
   list.innerHTML = items.map(([storageId,v]) => {
     const ing = v.ingId ? INGREDIENTI[v.ingId] : null;
     const costoPerUm = v.ingId && ing ? fmt(ing.costoUnit)+'/'+ing.um : null;
+    const history=(v.storicoPrezzi||[]).filter(h=>Number(h.prezzo)>0&&h.um===(v.um_fattura||'PZ'));
+    const last=history[history.length-1];
+    const previous=last?history.slice(0,-1).reverse().find(h=>h.data!==last.data):null;
+    const delta=last&&previous&&previous.prezzo?((last.prezzo-previous.prezzo)/previous.prezzo)*100:null;
+    const suggestion=!v.ingId?trovaIngredienteSuggerito(storageId):null;
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:0.8rem 1rem;margin-bottom:0.5rem">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.4rem">
         <div>
           <div style="font-weight:700;font-size:0.88rem">${v.descrizione}</div>
           <div style="font-size:0.7rem;color:var(--text3)">${v.fornitore} &nbsp;·&nbsp; Ultimo prezzo: ${fmt(v.ultimoPrezzo)} &nbsp;·&nbsp; ${v.ultimaQty||1} ${v.um_fattura||'PZ'}</div>
+          ${delta!==null?`<div class="price-change ${delta>0.1?'up':delta< -0.1?'down':'flat'}">${delta>0.1?'↗':delta< -0.1?'↘':'→'} ${delta>0?'+':''}${delta.toFixed(1)}% rispetto all’acquisto precedente</div>`:''}
         </div>
-        <div style="display:flex;gap:0.4rem;align-items:center">
+        <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap">
           ${ing?`<span class="cat-tag">${ing.nome}</span><span style="font-size:0.7rem;color:var(--text3)">${costoPerUm||''}</span>`:'<span style="font-size:0.72rem;color:var(--red)">Non associato</span>'}
+          ${suggestion?`<button class="btn blue" title="Apre l’associazione con l’ingrediente proposto: controlla confezione e unità" onclick="apriModalAssociazioneSuggerita('${storageId}','${suggestion.ingId}')">Suggerito: ${suggestion.nome}</button>`:''}
           <button class="btn ${v.ingId?'':'primary'}" onclick="apriModalAssociazione('${storageId}')">
             ${v.ingId?'✏':'+ Associa'}
           </button>
