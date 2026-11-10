@@ -1388,18 +1388,24 @@ function apriDettaglioFattura(id) {
 }
 
 // ── ASSOCIAZIONI ──────────────────────────────────────────────────
+function normalizzaDenominazioneArticolo(value){
+  return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+}
+function trovaAssociazionePerDenominazione(descrizione,excludeId){
+  const target=normalizzaDenominazioneArticolo(descrizione);
+  if(!target)return null;
+  for(const [id,assoc] of Object.entries(ASSOCIAZIONI)){
+    if(id===excludeId||!assoc.ingId||normalizzaDenominazioneArticolo(assoc.descrizione)!==target)continue;
+    const ingrediente=INGREDIENTI[assoc.ingId];
+    if(ingrediente)return {id,assoc,ingId:assoc.ingId,nome:ingrediente.nome};
+  }
+  return null;
+}
 function trovaIngredienteSuggerito(storageId){
   const current=ASSOCIAZIONI[storageId];
   if(!current)return null;
-  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
-  const target=norm(current.descrizione);
-  if(!target)return null;
-  for(const [otherId,other] of Object.entries(ASSOCIAZIONI)){
-    if(otherId===storageId||!other.ingId||norm(other.descrizione)!==target)continue;
-    const ing=INGREDIENTI[other.ingId];
-    if(ing)return {ingId:other.ingId,nome:ing.nome};
-  }
-  return null;
+  const match=trovaAssociazionePerDenominazione(current.descrizione,storageId);
+  return match?{ingId:match.ingId,nome:match.nome}:null;
 }
 function apriModalAssociazioneSuggerita(storageId,ingId){
   apriModalAssociazione(storageId);
