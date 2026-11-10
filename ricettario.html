@@ -891,10 +891,9 @@ async function sincronizzaRicetteChiusure(){
   const prodotti=new Map(), ordineTipo={anno:0,mese:1,settimana:2,giorno:3};
   const docs=[...CHIUSURE_CACHE].sort((a,b)=>String(a.data||'').localeCompare(String(b.data||''))||(ordineTipo[a.tipo]||0)-(ordineTipo[b.tipo]||0));
   for(const c of docs)for(const r of (c.chiusura||[])){
-    const nome=String(r.prodotto||'').trim(), key=chiaveProdottoRic(nome), qty=Number(r.qty)||0, totale=Number(r.totale)||0, cat=chiaveProdottoRic(r.cat||'');
+    const nome=String(r.prodotto||'').trim(),key=chiaveProdottoRic(nome),qty=Number(r.qty)||0,totale=Number(r.totale)||0,cat=chiaveProdottoRic(r.cat||'');
     if(!key||qty<=0||cat==='SERVIZIO'||cat==='CLIENTE')continue;
-    const imp=Number(r.imponibile);
-    const netto=imp>0?imp:(totale>0?totale/1.10:0);
+    const imp=Number(r.imponibile),netto=imp>0?imp:(totale>0?totale/1.10:0);
     const p=prodotti.get(key)||{nome,categoria:String(r.cat||'').trim(),codice:String(r.cod||'').trim(),prezzo:0,peso:0,prezzoNetto:0,pesoNetto:0,nettoStimato:false,data:''};
     if(totale>0){p.prezzo+=totale;p.peso+=qty;}
     if(netto>0){p.prezzoNetto+=netto;p.pesoNetto+=qty;if(r.imponibileStimato!==false)p.nettoStimato=true;}
@@ -906,17 +905,20 @@ async function sincronizzaRicetteChiusure(){
   for(const [id,r] of Object.entries(RICETTE)){const k=r.prodottoChiave||chiaveProdottoRic(r.nome);if(k&&!byKey.has(k))byKey.set(k,{id,r});}
   let created=0,updated=0,existing=0;
   for(const [key,p] of prodotti){
-    const match=byKey.get(key), prezzo=p.peso?p.prezzo/p.peso:0;
-    const prezzoNetto=p.pesoNetto?p.prezzoNetto/p.pesoNetto:(prezzo/1.10);
+    const match=byKey.get(key),prezzo=p.peso?p.prezzo/p.peso:0;
+    const prezzoNetto=p.pesoNetto?p.prezzoNetto/p.pesoNetto:prezzo/1.10;
     const aliquotaIva=prezzoNetto>0?Math.max(0,Math.min(30,((prezzo/prezzoNetto)-1)*100)):10;
     if(match&&match.r.origine!=='chiusure'){existing++;continue;}
     if(match){
       const id=match.id,r=match.r,ultima=String(r.ultimaChiusura||'');
-      const next={...r,nome:p.nome,categoria:r.categoria||p.categoria,codiceVendita:p.codice||r.codiceVendita,prezzoOsservato:prezzo,prezzoNettoOsservato:prezzoNetto,prezzoNettoStimato:p.nettoStimato,aliquotaIva:r.aliquotaIva||aliquotaIva,ultimaChiusura:p.data||ultima};
-      if(!r.prezzoManuale&&p.data>=ultima&&prezzo>0){next.prezzo=prezzo;if(!r.prezzoNettoManuale){next.prezzoNetto=prezzoNetto;next.prezzoNettoStimato=p.nettoStimato;}}
+      const next={...r,nome:p.nome,categoria:r.categoria||p.categoria,codiceVendita:p.codice||r.codiceVendita,prezzoOsservato:prezzo,prezzoNettoOsservato:prezzoNetto,nettoStimato:p.nettoStimato,ultimaChiusura:p.data||ultima};
+      if(!r.prezzoManuale&&p.data>=ultima&&prezzo>0){
+        next.prezzo=prezzo;
+        if(!r.prezzoNettoManuale){next.prezzoNetto=prezzoNetto;next.prezzoNettoStimato=p.nettoStimato;next.aliquotaIva=aliquotaIva;}
+      }
       if(JSON.stringify(next)!==JSON.stringify(r)){await window._save('ricette',id,next);RICETTE[id]=next;updated++;}else existing++;
     }else{
-      const id=idProdottoRic(key), recipe={nome:p.nome,categoria:p.categoria||'',prezzo,prezzoNetto,prezzoNettoStimato:p.nettoStimato,aliquotaIva,porzioni:1,ingredienti:[],origine:'chiusure',prodottoChiave:key,codiceVendita:p.codice,prezzoOsservato:prezzo,prezzoNettoOsservato:prezzoNetto,prezzoManuale:false,ultimaChiusura:p.data||'',aggiornato:new Date().toISOString()};
+      const id=idProdottoRic(key),recipe={nome:p.nome,categoria:p.categoria||'',prezzo,prezzoNetto,prezzoNettoStimato:p.nettoStimato,aliquotaIva,porzioni:1,ingredienti:[],origine:'chiusure',prodottoChiave:key,codiceVendita:p.codice,prezzoOsservato:prezzo,prezzoNettoOsservato:prezzoNetto,prezzoManuale:false,ultimaChiusura:p.data||'',aggiornato:new Date().toISOString()};
       await window._save('ricette',id,recipe);RICETTE[id]=recipe;byKey.set(key,{id,r:recipe});created++;
     }
   }
