@@ -744,6 +744,58 @@ body.light .emoji-btn { background: #e8eaed; }
 #mese-container { padding: 0 1rem 0.8rem; }
 #mese-container label { color: var(--text3); font-size: 0.75rem; font-family: 'Barlow Condensed', sans-serif; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 #mese-select { appearance: none; background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem; margin-top: 0.4rem; width: 100%; max-width: 250px; font-size: 0.9rem; font-family: 'Barlow', sans-serif; display: block; outline: none; }
+
+/* EGO UI refresh — shared, minimal visual system */
+:root{
+  --bg:#0b0d11;--surface:#13161c;--surface2:#1b1f27;
+  --border:rgba(255,255,255,.085);--accent:#e7b94f;--accent2:#77aee8;
+  --text:#f2f3f5;--text2:#b2b7c1;--text3:#7b8290;
+}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;line-height:1.45}
+button,input,select,textarea{font:inherit}
+:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+/* Shared controls */
+.btn,.btn-sm,.btn-quick,.btn-icon,.btn-obiettivo-edit,.btn-locale-action,
+.btn-google,.btn-save,.btn-analisi{transition:background-color .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease,transform .16s ease}
+.btn,.btn-sm,.search,.search-input,.sort-select,.select,.form-input,.login-input{
+  border-radius:9px
+}
+.btn{min-height:36px}
+.btn.primary,.btn-save,.btn-analisi{box-shadow:none}
+.btn-save:hover,.btn-analisi:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(231,185,79,.16)}
+input,select,textarea{accent-color:var(--accent)}
+/* Surfaces */
+.card,.giorno-card,.totali-bar,.obiettivo-widget,.locale-card,.fattura-card,.modal,
+.import-status,.stat-table,.panel-card{
+  box-shadow:none
+}
+.card,.giorno-card,.locale-card,.fattura-card,.obiettivo-widget,.totali-bar{
+  border-color:var(--border);border-radius:12px
+}
+.card:hover,.giorno-card:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(0,0,0,.16)}
+/* Navigation */
+.home-header,.dash-header,.locale-header,.header{
+  background:rgba(11,13,17,.94);border-color:var(--border);box-shadow:none
+}
+.tabs{background:rgba(11,13,17,.96);border-color:var(--border)}
+.tab{letter-spacing:.06em}
+.tab.active{color:var(--accent)}
+/* Data and section layout */
+.stat-table th,th{letter-spacing:.07em}
+.stat-table td,td{border-color:var(--border)}
+.section-title,.analisi-title{letter-spacing:.13em}
+.empty-state,.empty{padding:2.5rem 1rem}
+@media(max-width:700px){
+  .home-header,.dash-header,.header{padding:.7rem .85rem}
+  .panel{padding:.8rem}
+  .giorni-list,.analisi-section{padding:.8rem}
+  .list-controls,.fc-toolbar{padding-left:.8rem;padding-right:.8rem}
+  .home-actions{gap:.25rem}
+  .tab{padding:.65rem .7rem;font-size:.78rem}
+  .totali-bar,.obiettivo-widget{margin-left:.8rem;margin-right:.8rem}
+}
+
 </style>
 </head>
 <body>
