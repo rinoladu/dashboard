@@ -282,6 +282,29 @@ td{border-color:var(--border)}
   .assoc-row{grid-template-columns:1fr}
 }
 
+
+/* Smartphone refinements */
+@media(max-width:700px){
+  .header{padding:.55rem .65rem;gap:.3rem;flex-wrap:nowrap;align-items:center}
+  .header>div:first-child{flex:1 1 auto;min-width:0}
+  .header>div:first-child .logo{font-size:1.25rem;letter-spacing:.06em;white-space:nowrap}
+  .header>div:first-child .logo-sub{font-size:.55rem;letter-spacing:.1em}
+  .header>div:last-child{display:flex;flex:0 0 auto;gap:.2rem!important;flex-wrap:nowrap!important;align-items:center}
+  .header>div:last-child .btn{min-height:34px;padding:.3rem .38rem;font-size:.62rem;letter-spacing:.02em}
+  .tabs{overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:0 0 auto}
+  .table-wrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .table-wrap table{min-width:580px}
+  .table-wrap th,.table-wrap td{white-space:nowrap}
+  .table-wrap td:first-child{white-space:normal;min-width:150px}
+}
+@media(max-width:380px){
+  .header>div:first-child .logo{font-size:1.1rem}
+  .header>div:last-child .btn{padding:.28rem .32rem;font-size:.58rem}
+  .table-wrap table{min-width:560px}
+}
+
 </style>
 </head>
 <body>
